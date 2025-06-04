@@ -1,0 +1,162 @@
+==================================================
+=== REPORTE DE ANÁLISIS DE CÓDIGO ===
+Proyecto: auditoria-redhat
+Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat
+Generado el: Wed Jun  4 13:56:39 -03 2025
+==================================================
+
+--- INFORMACIÓN DEL REPOSITORIO GIT ---
+Rama actual: main
+Último commit: 6ccff36 - Primer commit (andreiveisuade, 63 minutes ago)
+---
+
+--- ESTRUCTURA DEL DIRECTORIO ---
+.
+├── auditoria_principal.sh
+├── consigna.md
+└── scripts
+    ├── ajustar_permisos.sh
+    ├── auditar_usuarios.sh
+    ├── configurar_firewall.sh
+    ├── escanear_puertos.sh
+    ├── verificar_logs.sh
+    └── verificar_repositorios.sh
+
+2 directories, 8 files
+---
+
+
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_principal.sh 
+
+#!/bin/bash
+
+# Obtener información del sistema
+FECHA_HORA=$(date +"%Y%m%d_%H%M%S")
+NOMBRE_MAQUINA=$(hostname)
+ID_MAQUINA=$(hostid)
+USUARIO=$(whoami)
+
+# Crear nombre de archivo de salida
+ARCHIVO_SALIDA="auditoria_${NOMBRE_MAQUINA}_${FECHA_HORA}.txt"
+
+# Función para mostrar mensajes tanto en pantalla como en el archivo de log
+log() {
+    echo "$1"
+    echo "$1" >> "$ARCHIVO_SALIDA"
+}
+
+# Iniciar auditoría
+log "=== INICIO DE AUDITORÍA ==="
+log "Fecha y hora: $(date '+%Y-%m-%d %H:%M:%S')"
+log "Máquina: $NOMBRE_MAQUINA"
+log "ID de máquina: $ID_MAQUINA"
+log "Usuario: $USUARIO"
+log ""
+
+# Ejecutar cada script de auditoría
+for script in scripts/*.sh; do
+    log "== Ejecutando: $script =="
+    # Redirigir la salida estándar y de error al archivo y a la pantalla
+    bash "$script" 2>&1 | tee -a "$ARCHIVO_SALIDA"
+    log ""
+done
+
+log "=== AUDITORÍA COMPLETADA ==="
+log "Resultados guardados en: $(pwd)/$ARCHIVO_SALIDA"
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/consigna.md 
+
+# Unidad 6
+
+## “Fortalecimiento del Servidor de Producción: Auditoría, Endurecimiento y Control de Integridad”
+
+### Planteamiento del Problema
+
+La empresa “TechLogix” ha desplegado recientemente dos servidores basados en Red Hat: uno para aplicaciones web y otro para base de datos. Ante la inminente conexión con el entorno público, el responsable de sistemas recibe la orden de realizar una auditoría de seguridad básica y aplicar medidas de endurecimiento del sistema operativo, siguiendo las buenas prácticas de seguridad.
+
+## Se requiere:
+1. Escanear el servidor de base de datos desde el servidor de aplicaciones para identificar puertos abiertos.
+2. Limitar los servicios activos y aplicar reglas de firewall estrictas.
+3. Revisar y ajustar permisos de archivos y directorios sensibles.
+4. Detectar paquetes instalados desde fuentes no oficiales o sospechosas.
+5. Asegurarse de que solo usuarios autorizados tengan cuentas activas, y que no existan contraseñas vacías.
+6. Registrar todas las acciones en un archivo de log.
+7. Automatizar parte del proceso con bash.
+
+
+
+## Objetivos de Seguridad Cubiertos
+•	Mínima superficie de ataque (puertos/servicios).
+•	Integridad del sistema de archivos y configuraciones.
+•	Control de usuarios y accesos.
+•	Buenas prácticas de auditoría y documentación.
+•	Uso exclusivo de comandos de terminal y bash scripting.
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/ajustar_permisos.sh 
+
+#!/bin/bash
+echo "[Revisión de Permisos]"
+ls -l /etc/shadow
+ls -l /etc/passwd
+ls -ld /root
+
+echo "[Ajustando permisos...]"
+sudo chmod 600 /etc/shadow
+sudo chmod 644 /etc/passwd
+sudo chmod 700 /root
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/auditar_usuarios.sh 
+
+#!/bin/bash
+echo "[Auditoría de Usuarios]"
+cut -d: -f1 /etc/passwd
+awk -F: '$3 == 0 { print "Usuario con UID 0: " $1 }' /etc/passwd
+sudo awk -F: '$2 == "" { print "Contraseña vacía: " $1 }' /etc/shadow
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/configurar_firewall.sh 
+
+#!/bin/bash
+echo "[Configuración de Firewall]"
+sudo firewall-cmd --permanent --remove-service=ftp
+sudo firewall-cmd --permanent --remove-service=telnet
+sudo firewall-cmd --permanent --add-service=ssh
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --permanent --add-service=https
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-all
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/escanear_puertos.sh 
+
+#!/bin/bash
+echo "[Escaneo de Puertos]"
+if command -v nmap >/dev/null 2>&1; then
+  sudo nmap -sT -F localhost
+else
+  echo "nmap no está instalado. Saltando."
+fi
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/verificar_logs.sh 
+
+#!/bin/bash
+echo "[Análisis de accesos SSH]"
+sudo grep -E "Failed|Accepted" /var/log/secure | tail -n 20
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/verificar_repositorios.sh 
+
+#!/bin/bash
+echo "[Repositorios y paquetes]"
+dnf repolist
+echo "[Paquetes no oficiales sospechosos:]"
+dnf list installed | grep -vE '(@base|@appstream|@epel|@rhel|@fedora)'
+==================================================
+=== FIN DEL REPORTE ===
+==================================================
