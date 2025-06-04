@@ -4,7 +4,7 @@
 
 ### Planteamiento del Problema
 
-La empresa “TechLogix” ha desplegado recientemente dos servidores basados en Red Hat: uno para aplicaciones web y otro para base de datos. Ante la inminente conexión con el entorno público, el responsable de sistemas recibe la orden de realizar una auditoría de seguridad básica y aplicar medidas de endurecimiento del sistema operativo, siguiendo las buenas prácticas de seguridad.
+Una pequeña empresa ha desplegado recientemente dos servidores basados en Red Hat: uno para aplicaciones web y otro para base de datos. Ante la inminente conexión con el entorno público, el responsable de sistemas recibe la orden de realizar una auditoría de seguridad básica y aplicar medidas de endurecimiento del sistema operativo, siguiendo las buenas prácticas de seguridad.
 
 ## Se requiere:
 1. Escanear el servidor de base de datos desde el servidor de aplicaciones para identificar puertos abiertos.
