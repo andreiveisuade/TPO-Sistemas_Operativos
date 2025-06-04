@@ -1,34 +1,40 @@
 #!/bin/bash
+# set -e
+set -u
+
 ARCHIVOS_SENSIBLES=(
     "/etc/shadow:600"
-    "/etc/gshadow:600" # Similar a shadow, pero para grupos
+    "/etc/gshadow:600"
     "/etc/passwd:644"
     "/etc/group:644"
-    "/root:700:d" # 'd' indica que es un directorio
+    "/root:700:d"
 )
 
-echo "Revisando y ajustando permisos de archivos/directorios sensibles..."
-echo "--------------------------------------------------------------------"
+echo "INFO: Iniciando revisión y ajuste de permisos de archivos/directorios sensibles."
 
 for item_perm in "${ARCHIVOS_SENSIBLES[@]}"; do
-    IFS=':' read -r item perm tipo <<< "$item_perm"
+    IFS=':' read -r item perm_deseado tipo <<< "$item_perm"
     
-    echo ""
-    echo "Verificando: $item"
+    echo "--- Verificando: $item ---"
     if [ "$tipo" == "d" ]; then
-        echo "Permisos actuales:"
-        ls -ld "$item"
-        echo "Ajustando permisos de $item a $perm (si es necesario)..."
-        sudo chmod "$perm" "$item"
-        echo "Permisos después del ajuste:"
-        ls -ld "$item"
+        perm_actual=$(stat -c "%a" "$item")
+        ls -ld "$item" # Muestra permisos actuales
     else
-        echo "Permisos actuales:"
-        ls -l "$item"
-        echo "Ajustando permisos de $item a $perm (si es necesario)..."
-        sudo chmod "$perm" "$item"
-        echo "Permisos después del ajuste:"
-        ls -l "$item"
+        perm_actual=$(stat -c "%a" "$item")
+        ls -l "$item" # Muestra permisos actuales
+    fi
+
+    if [ "$perm_actual" != "$perm_deseado" ]; then
+        echo "INFO: Ajustando permisos de $item de $perm_actual a $perm_deseado..."
+        if sudo chmod "$perm_deseado" "$item"; then
+            echo "INFO: Permisos ajustados para $item."
+            # Mostrar permisos después del ajuste
+            if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi
+        else
+            echo "ERROR: Falló el ajuste de permisos para $item."
+        fi
+    else
+        echo "INFO: Permisos para $item ya son correctos ($perm_actual)."
     fi
 done
 echo "--------------------------------------------------------------------"
