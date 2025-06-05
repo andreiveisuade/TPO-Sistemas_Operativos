@@ -58,7 +58,7 @@ CONTADOR=0
 
 # Itera sobre todos los scripts en el directorio scripts/ que sigan el patrón ??_*.sh
 # Los scripts se ejecutan en orden numérico (01_*.sh, 02_*.sh, etc.)
-for script in scripts/??_*.sh; do
+for script in scripts/fase1/*.sh; do
     # Verificar si el archivo existe (en caso de que no haya scripts)
     [ -f "$script" ] || continue
     

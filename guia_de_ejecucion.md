@@ -2,16 +2,17 @@
 
 ### Escenario
 
-* **servera**: Servidor de aplicaciones. Ejecuta el escaneo remoto.
-* **serverb**: Servidor de base de datos. Es el objetivo del escaneo y endurecimiento.
+* **workstation**: Servidor de aplicaciones. Ejecuta el escaneo remoto.
+* **utility**: Servidor de base de datos. Es el objetivo del escaneo y endurecimiento.
 
 ---
 
 ### Paso 1: Iniciar los servidores necesarios
 
-Desde el panel de Red Hat levantar y **Open Console**:
-  * `workstation`
-  * `utility`
+Desde el panel de Red Hat levantar y hacer **Open Console** de:
+
+- `workstation`
+- `utility`
 
 ---
 
@@ -22,16 +23,23 @@ Desde el panel de Red Hat levantar y **Open Console**:
 
 ---
 
-### Paso 2.1: Verificacion
+### Paso 2.1: Verificaciones previas
 
-1. Instalar nmap con `sudo dnf install nmap`
-2. Verificar que nmap esta instalado con `nmap --version`
-3. Hacer un ip route para verificar la ruta de red 
+1. Instalar `nmap` con:
 
+```bash
+sudo dnf install nmap
+```
 
-### Paso 3: Verificar conectividad con `utility`
+2. Verificar que `nmap` esta instalado con:
 
-Desde `workstation`, ejecutar:
+```bash
+nmap --version
+```
+
+3. Hacer un `ip route` para verificar la ruta de red
+
+### Paso 3 Verificar conectividad con `utility`
 
 ```bash
 ping 5 utility
@@ -39,11 +47,8 @@ ping 5 utility
 
 Debe responder con paquetes recibidos.
 
----
 
-### Paso 4.0: Dar permiso de Ejecución
-
-Desde `workstation`, ejecutar:
+### Paso 4 Dar permisos de ejecución
 
 ```bash
 chmod +x auditoria_fase1.sh
@@ -53,56 +58,32 @@ chmod +x scripts/02_configurar_firewall.sh
 chmod +x scripts/03_ajustar_permisos.sh
 ```
 
-### Paso 4: Ejecutar Fase 1 - Escaneo remoto
 
-En `workstation`, ejecutar:
+### Paso 5 Ejecutar Fase 1 - Escaneo remoto
+
+Desde `workstation`, ejecutar:
 
 ```bash
-bash auditoria_fase1.sh utility
+bash ./auditoria_fase1.sh utility
 ```
 
-* Corre el escaneo remoto sobre `utility`
-* Genera un log en `logs_auditoria/`
+Esto realizará el escaneo remoto y generará un reporte en `workstation` en la carpeta `reportes`.
 
----
-
-### Paso 5: Verificar acceso SSH a `utility`
-
-En `workstation`, ejecutar:
+### Paso 6 Verificar acceso SSH a `utility`
 
 ```bash
 ssh student@utility
 ```
 
-* Aceptar la clave si lo solicita (`yes`)
-* Ingresar la contraseña si es necesario
+Debe responder con la contraseña del usuario `student`.
 
----
-
-### Paso 6: Ejecutar Fase 2 - Endurecimiento remoto
+### Paso 7 Ejecutar Fase 2 - Endurecimiento
 
 Desde `workstation`, ejecutar:
 
 ```bash
-bash auditoria_fase2.sh student utility
+bash ./auditoria_fase2.sh utility
 ```
 
-Esto:
+Esto realizará el endurecimiento remoto y generará un reporte en `workstation` en la carpeta `reportes`.
 
-* Se conecta a `utility` por SSH
-* Ejecuta `02_configurar_firewall.sh`
-* Ejecuta `03_ajustar_permisos.sh`
-
----
-
-### Resultado Esperado
-
-* Log completo de escaneo en `workstation/logs_auditoria/`
-* Firewall y permisos endurecidos en `utility`
-
----
-
-### Notas finales
-
-* Si `ping` o `ssh` fallan, reiniciá las VMs y verificá que ambas estén encendidas.
-* También podés ejecutar `02_*.sh` y `03_*.sh` directamente en `utility` desde su consola si preferís.
