@@ -1,60 +1,62 @@
 #!/bin/bash
+# Script para configurar el firewall en el SERVIDOR DE BASE DE DATOS
+# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
 set -u
+set -e
 
-# Verificar privilegios de root
-if [ "$(id -u)" -ne 0 ]; then
-    echo "❌ Este script debe ejecutarse como root."
-    exit 1
-fi
+PUERTOS_BD_ABIERTOS=("3306/tcp") # <--- MODIFICAR SEGÚN LA BASE DE DATOS USADA
 
-# Verificar si firewalld está instalado
+echo "=== CONFIGURACIÓN DE FIREWALL EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
+echo "INFO: Ejecutando con privilegios de root."
+
 if ! command -v firewall-cmd &>/dev/null; then
-    echo "❌ firewalld no está instalado."
+    echo "ERROR: firewalld no está instalado. Instalar con: dnf install -y firewalld (o equivalente)"
     exit 1
 fi
 
-# Iniciar firewalld si no está activo
 if ! systemctl is-active --quiet firewalld; then
-    echo "⚙️ Iniciando firewalld..."
-    systemctl enable --now firewalld || {
-        echo "❌ No se pudo iniciar firewalld."
-        exit 1
-    }
+    echo "INFO: firewalld no está activo. Intentando iniciar y habilitar..."
+    systemctl enable --now firewalld || { echo "ERROR: No se pudo iniciar firewalld."; exit 1; }
 fi
 
-# Obtener zona activa
-ZONA_ACTIVA=$(firewall-cmd --get-active-zones | awk 'NR==1 {print $1}')
-ZONA_ACTIVA=${ZONA_ACTIVA:-public}
-echo "🌐 Zona activa detectada: $ZONA_ACTIVA"
+ZONA_ACTIVA=$(firewall-cmd --get-default-zone)
+echo "INFO: Se aplicarán reglas a la zona por defecto: $ZONA_ACTIVA"
 
-# Definir listas de servicios
-SERVICIOS_OK=("ssh" "http" "https")
-SERVICIOS_INSEGUROS=("ftp" "telnet" "samba" "smtp")
+echo "INFO: Estado actual del firewall en zona '$ZONA_ACTIVA':"
+firewall-cmd --zone="$ZONA_ACTIVA" --list-all
+echo "--------------------------------------------------"
 
-echo ""
-echo "🧹 Eliminando servicios inseguros..."
-for svc in "${SERVICIOS_INSEGUROS[@]}"; do
-    if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$svc" &>/dev/null; then
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --remove-service="$svc"
-        echo "  🔻 Eliminado: $svc"
+echo "INFO: Aplicando política restrictiva..."
+SERVICIOS_A_REMOVER=("ftp" "telnet" "samba")
+for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
+    if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
+        echo "  Removiendo servicio: $servicio"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --remove-service="$servicio"
     fi
 done
 
-echo ""
-echo "✅ Asegurando servicios esenciales..."
-for svc in "${SERVICIOS_OK[@]}"; do
-    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$svc" &>/dev/null; then
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-service="$svc"
-        echo "  ➕ Permitido: $svc"
+SERVICIOS_A_ASEGURAR=("ssh") # HTTP/HTTPS no suelen ser necesarios en un servidor de BD dedicado
+for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
+    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
+        echo "  Añadiendo servicio esencial: $servicio"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-service="$servicio"
     fi
 done
 
-# Recargar configuración
-echo ""
-echo "♻️ Recargando configuración del firewall..."
-firewall-cmd --reload
+for puerto_bd in "${PUERTOS_BD_ABIERTOS[@]}"; do
+    echo "  Permitiendo puerto de base de datos: $puerto_bd"
+    firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
+done
 
-# Mostrar configuración final
-echo ""
-echo "🎯 Configuración final de servicios permitidos en zona '$ZONA_ACTIVA':"
-firewall-cmd --zone="$ZONA_ACTIVA" --list-services
+echo "INFO: Recargando firewalld..."
+if firewall-cmd --reload; then
+    echo "INFO: Firewall recargado."
+else
+    echo "ERROR: Falló la recarga del firewall."
+    exit 1
+fi
+
+echo "INFO: Configuración final del firewall en zona '$ZONA_ACTIVA':"
+firewall-cmd --zone="$ZONA_ACTIVA" --list-all
+echo "--------------------------------------------------"
+echo "Configuración del firewall del servidor de BD completada."

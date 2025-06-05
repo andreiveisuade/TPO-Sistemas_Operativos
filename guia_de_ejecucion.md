@@ -87,3 +87,6 @@ bash ./auditoria_fase2.sh utility
 
 Esto realizará el endurecimiento remoto y generará un reporte en `workstation` en la carpeta `reportes`.
 
+
+
+xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5

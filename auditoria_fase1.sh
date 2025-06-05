@@ -1,108 +1,74 @@
 #!/bin/bash
-# Establece el intérprete de comandos a usar (bash)
-
-# Configuración de opciones del shell:
-# -u: Genera un error al usar variables no definidas
 set -u
 
 # ===== FUNCIONES AUXILIARES =====
 mostrar_ayuda() {
-    echo "Uso: $0 <ip_servidor>"
+    echo "Uso: $0 <ip_servidor_objetivo>"
     echo "Ejemplo: $0 192.168.1.100"
-    echo "\nArgumentos:"
-    echo "  <ip_servidor>  Dirección IP del servidor a auditar (requerido)"
     exit 1
 }
 
 # Validar parámetros
 if [ $# -ne 1 ]; then
-    echo "Error: Se requiere la dirección IP del servidor como parámetro"
+    echo "Error: Se requiere la dirección IP del servidor objetivo como parámetro."
     mostrar_ayuda
 fi
 
-# Validar formato de IP (solo verifica que tenga el formato básico)
-if [[ ! $1 =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-    echo "Error: El formato de la IP no es válido"
+IP_SERVIDOR_OBJETIVO="$1" # Renombrado para más claridad
+
+if [[ ! $IP_SERVIDOR_OBJETIVO =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo "Error: El formato de la IP '$IP_SERVIDOR_OBJETIVO' no es válido."
     mostrar_ayuda
 fi
-
-# Asignar IP del parámetro
-IP_SERVIDOR_BD="$1"
 
 # ===== CONFIGURACIÓN INICIAL =====
-# Directorio donde se guardarán los logs
 LOG_DIR="./logs_auditoria"
-# Crear el directorio de logs si no existe
-# -p: Crea directorios padres si no existen
 mkdir -p "$LOG_DIR"
-
-# Generar nombre de archivo de log con marca de tiempo
-# Formato: auditoria_<nombre_host>_<AAAAMMDD_HHMMSS>.txt
 FECHA=$(date +"%Y%m%d_%H%M%S")
-LOG="${LOG_DIR}/auditoria_$(hostname)_${FECHA}.txt"
+NOMBRE_MAQUINA_ACTUAL=$(hostname) # Máquina desde donde se ejecuta la auditoría
+LOG="${LOG_DIR}/auditoria_Fase1_${NOMBRE_MAQUINA_ACTUAL}_to_${IP_SERVIDOR_OBJETIVO}_${FECHA}.txt"
 
-# Iniciar el archivo de log con información de la auditoría
-echo "INICIO DE AUDITORÍA: $(date)" > "$LOG"
-echo "Servidor objetivo: $IP_SERVIDOR_BD" >> "$LOG"
+# Iniciar el archivo de log
+echo "INICIO DE AUDITORÍA (Fase 1 - Escaneo Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
+echo "Ejecutada desde: $NOMBRE_MAQUINA_ACTUAL" >> "$LOG"
+echo "Servidor Objetivo: $IP_SERVIDOR_OBJETIVO" >> "$LOG"
+echo "----------------------------------------------------------" >> "$LOG"
 echo "" >> "$LOG"
 
 # ===== EJECUCIÓN DE SCRIPTS DE AUDITORÍA =====
-# Verificar si existe el directorio de scripts
-if [ ! -d "scripts" ]; then
-    echo "Error: No se encontró el directorio 'scripts'" | tee -a "$LOG"
+SCRIPTS_DIR_FASE1="./scripts/fase1"
+if [ ! -d "$SCRIPTS_DIR_FASE1" ]; then
+    echo "Error: No se encontró el directorio de scripts '$SCRIPTS_DIR_FASE1'" | tee -a "$LOG"
     exit 1
 fi
 
-# Contador de scripts ejecutados
-CONTADOR=0
+SCRIPT_ESCANEAR="${SCRIPTS_DIR_FASE1}/01_escanear.sh"
+SCRIPTS_FALLIDOS=0
 
-# Itera sobre todos los scripts en el directorio scripts/ que sigan el patrón ??_*.sh
-# Los scripts se ejecutan en orden numérico (01_*.sh, 02_*.sh, etc.)
-for script in scripts/fase1/*.sh; do
-    # Verificar si el archivo existe (en caso de que no haya scripts)
-    [ -f "$script" ] || continue
-    
-    # Incrementar contador
-    ((CONTADOR++))
-    
-    # Mostrar en consola y guardar en log el script que se está ejecutando
-    echo "== Ejecutando $script ==" | tee -a "$LOG"
-    
-    # Verificar si es el script de escaneo (que necesita la IP como parámetro)
-    if [[ "$(basename "$script")" == "01_escanear.sh" ]]; then
-        # Ejecutar script de escaneo con la IP como parámetro
-        # >> "$LOG" 2>&1: Redirige tanto la salida estándar como la de error al archivo de log
-        bash "$script" "$IP_SERVIDOR_BD" >> "$LOG" 2>&1
-    else
-        # Ejecutar otros scripts sin parámetros adicionales
-        bash "$script" >> "$LOG" 2>&1
-    fi
-
-    # Verificar el código de salida del script ejecutado
-    # $? contiene el código de salida del último comando ejecutado
-    # -ne 0: Verifica si el comando falló (código distinto de cero)
+if [ -f "$SCRIPT_ESCANEAR" ]; then
+    echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $IP_SERVIDOR_OBJETIVO ==" | tee -a "$LOG"
+    # Ejecutar script y redirigir toda su salida al log
+    bash "$SCRIPT_ESCANEAR" "$IP_SERVIDOR_OBJETIVO" >> "$LOG" 2>&1
     if [ $? -ne 0 ]; then
-        # Mostrar error si el script falló
-        echo "ERROR al ejecutar $script" | tee -a "$LOG"
+        echo "ERROR al ejecutar $(basename "$SCRIPT_ESCANEAR")" | tee -a "$LOG"
+        SCRIPTS_FALLIDOS=1
     else
-        # Confirmar que el script se ejecutó correctamente
-        echo "$script completado" | tee -a "$LOG"
+        echo "$(basename "$SCRIPT_ESCANEAR") completado" | tee -a "$LOG"
     fi
-    
-    # Agregar línea en blanco para mejor legibilidad en el log
     echo "" >> "$LOG"
-done
-
-# Verificar si se ejecutó al menos un script
-if [ $CONTADOR -eq 0 ]; then
-    echo "Advertencia: No se encontraron scripts para ejecutar en el directorio 'scripts/'" | tee -a "$LOG"
+else
+    echo "Advertencia: No se encontró el script $SCRIPT_ESCANEAR" | tee -a "$LOG"
+    SCRIPTS_FALLIDOS=1
 fi
 
 # ===== FINALIZACIÓN =====
-# Registrar hora de finalización y ubicación del log
-echo "FIN DE AUDITORÍA: $(date)" >> "$LOG"
-echo "Log guardado en: $LOG"
-# Mostrar ubicación del log en la consola
-echo "Auditoría completada. Ver resultados en: $LOG"
+echo "----------------------------------------------------------" >> "$LOG"
+echo "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG"
+if [ $SCRIPTS_FALLIDOS -ne 0 ]; then
+    echo "ATENCIÓN: La Fase 1 de auditoría finalizó con errores." | tee -a "$LOG"
+fi
+echo "Log de Fase 1 guardado en: $LOG"
+echo "Auditoría Fase 1 completada. Ver resultados en: $LOG"
+if [ $SCRIPTS_FALLIDOS -ne 0 ]; then echo "ATENCIÓN: Hubo errores durante la Fase 1."; fi
 
-exit 0
+exit $SCRIPTS_FALLIDOS
