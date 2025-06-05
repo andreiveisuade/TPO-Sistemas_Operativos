@@ -28,7 +28,7 @@ echo "-----------------------------"
 # -p-: Escanea todos los puertos (1-65535)
 echo ""
 echo "Escaneo de puertos TCP (nmap -sT)"
-sudo nmap -sT -p- "$TARGET"
+sudo nmap -F "$TARGET"
 
 # Detección de versiones de servicios
 # -sV: Detecta versiones de servicios en puertos abiertos
