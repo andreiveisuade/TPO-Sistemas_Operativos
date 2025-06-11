@@ -1,25 +1,50 @@
 #!/bin/bash
-set -eu
+# Script para ajustar permisos en el SERVIDOR DE BASE DE DATOS
+# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
+set -u
+set -e
 
-ARCHIVOS=(
-  "/etc/shadow:600"
-  "/etc/gshadow:600"
-  "/etc/passwd:644"
-  "/etc/group:644"
-  "/root:700"
-  "/var/lib/mysql:700"
-  "/etc/my.cnf:600"
+# <--- MODIFICACIÓN: Activamos las reglas para MySQL/MariaDB y añadimos comentarios ---
+# Basado en el escaneo de Fase 1, se detectó un servidor MySQL/MariaDB.
+# Por lo tanto, se activan estas reglas para asegurar los archivos de configuración y datos.
+ARCHIVOS_SENSIBLES=(
+    "/etc/shadow:600:f"
+    "/etc/gshadow:600:f"
+    "/etc/passwd:644:f"
+    "/etc/group:644:f"
+    "/root:700:d"
+    # Reglas específicas para MySQL/MariaDB activadas:
+    "/var/lib/mysql:700:d"     # Directorio de datos de MySQL/MariaDB
+    "/etc/my.cnf:600:f"        # Archivo de configuración principal de MySQL/MariaDB
 )
 
-for item in "${ARCHIVOS[@]}"; do
-  path="${item%%:*}"
-  perm="${item##*:}"
-  [[ -e "$path" ]] || { echo "No existe $path"; continue; }
+echo "=== AJUSTE DE PERMISOS CRÍTICOS EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
+echo "INFO: Ejecutando con privilegios de root."
 
-  actual=$(stat -c "%a" "$path")
-  if [ "$actual" != "$perm" ]; then
-    chmod "$perm" "$path" && echo "✔ $path → $perm"
-  else
-    echo "✓ $path ya tiene permisos correctos"
-  fi
+for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
+    IFS=':' read -r item perm_deseado tipo <<< "$item_perm_tipo"
+    
+    if [ ! -e "$item" ]; then
+        echo "AVISO: El archivo o directorio '$item' no existe. Saltando."
+        continue
+    fi
+
+    perm_actual=$(stat -c "%a" "$item")
+    echo "Verificando: $item (Actual: $perm_actual, Deseado: $perm_deseado)"
+
+    if [ "$perm_actual" != "$perm_deseado" ]; then
+        echo "  Ajustando permisos de '$item' de $perm_actual a $perm_deseado..."
+        if chmod "$perm_deseado" "$item"; then
+            echo "    Permisos ajustados."
+        else
+            echo "    ERROR: Falló el ajuste de permisos para '$item'."
+        fi
+    else
+        echo "  Permisos para '$item' ya son correctos ($perm_actual)."
+    fi
+    
+    # Mostrar permisos después del intento de ajuste
+    if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi
+    echo "---"
 done
+echo "✅ Ajuste de permisos completado ✅"
