@@ -1,67 +1,24 @@
 #!/bin/bash
-# Script para configurar el firewall en el SERVIDOR DE BASE DE DATOS
-# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
-set -u
-set -e
+set -eu
 
-PUERTOS_BD_ABIERTOS=("3306/tcp") # <--- MODIFICAR SEGÚN LA BASE DE DATOS USADA (ej. "3306/tcp 5432/tcp")
+PUERTOS_BD_ABIERTOS=("3306/tcp")
+SERVICIOS_A_REMOVER=("http" "https" "ftp" "telnet" "samba")
 
-echo "=== CONFIGURACIÓN DE FIREWALL EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
-echo "INFO: Ejecutando con privilegios de root."
+[[ -x "$(command -v firewall-cmd)" ]] || { echo "No está firewalld"; exit 1; }
+systemctl enable --now firewalld
 
-if ! command -v firewall-cmd &> /dev/null; then
-    echo "ERROR: firewalld no está instalado. Instalar con: dnf install -y firewalld (o equivalente)"
-    exit 1
-fi
+ZONA=$(firewall-cmd --get-default-zone)
+echo "[*] Configurando zona: $ZONA"
 
-if ! systemctl is-active --quiet firewalld; then
-    echo "INFO: firewalld no está activo. Intentando iniciar y habilitar..."
-    systemctl enable --now firewalld || { echo "ERROR: No se pudo iniciar firewalld."; exit 1; }
-fi
-
-ZONA_ACTIVA=$(firewall-cmd --get-default-zone)
-echo "INFO: Se aplicarán reglas a la zona por defecto: $ZONA_ACTIVA"
-
-echo "INFO: Estado actual del firewall en zona '$ZONA_ACTIVA':"
-firewall-cmd --zone="$ZONA_ACTIVA" --list-all
-echo "--------------------------------------------------"
-
-echo "INFO: Aplicando política restrictiva..."
-SERVICIOS_A_REMOVER=("ftp" "telnet" "samba" "http" "https") # Añadir http/https si no son necesarios en servidor BD
-for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
-    if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
-        echo "  Removiendo servicio: $servicio"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --remove-service="$servicio"
-    fi
+for s in "${SERVICIOS_A_REMOVER[@]}"; do
+  firewall-cmd --permanent --zone="$ZONA" --remove-service="$s" 2>/dev/null || true
 done
 
-SERVICIOS_A_ASEGURAR=("ssh") # Solo SSH es esencial para administración
-for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
-    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
-        echo "  Añadiendo servicio esencial: $servicio"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-service="$servicio"
-    fi
+firewall-cmd --permanent --zone="$ZONA" --add-service=ssh
+
+for p in "${PUERTOS_BD_ABIERTOS[@]}"; do
+  firewall-cmd --permanent --zone="$ZONA" --add-port="$p"
 done
 
-for puerto_bd in "${PUERTOS_BD_ABIERTOS[@]}"; do
-    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-port="$puerto_bd" &>/dev/null; then
-        echo "  Permitiendo puerto de base de datos: $puerto_bd"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
-    else
-        echo "  Puerto $puerto_bd ya permitido."
-    fi
-done
-
-
-echo "INFO: Recargando firewalld..."
-if firewall-cmd --reload; then
-    echo "INFO: Firewall recargado."
-else
-    echo "ERROR: Falló la recarga del firewall."
-    exit 1
-fi
-
-echo "INFO: Configuración final del firewall en zona '$ZONA_ACTIVA':"
-firewall-cmd --zone="$ZONA_ACTIVA" --list-all
-echo "--------------------------------------------------"
-echo "✅ Configuración del firewall del servidor de BD completada."
+firewall-cmd --reload
+firewall-cmd --zone="$ZONA" --list-all

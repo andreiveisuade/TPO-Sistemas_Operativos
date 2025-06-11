@@ -27,4 +27,4 @@ echo -e "\n[+] Puertos escuchando (LISTEN) en esta máquina (ss -tulnp):"
 ss -tulnp | grep 'LISTEN'
 echo "---"
 
-echo "✅ Auditoría inicial de servicios y conexiones completada."
+echo "✅ Auditoría inicial de servicios y conexiones completada ✅"
