@@ -4,12 +4,12 @@
 set -u
 set -e
 
-PUERTOS_BD_ABIERTOS=("3306/tcp") # <--- MODIFICAR SEGÚN LA BASE DE DATOS USADA
+PUERTOS_BD_ABIERTOS=("3306/tcp") # <--- MODIFICAR SEGÚN LA BASE DE DATOS USADA (ej. "3306/tcp 5432/tcp")
 
 echo "=== CONFIGURACIÓN DE FIREWALL EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
 echo "INFO: Ejecutando con privilegios de root."
 
-if ! command -v firewall-cmd &>/dev/null; then
+if ! command -v firewall-cmd &> /dev/null; then
     echo "ERROR: firewalld no está instalado. Instalar con: dnf install -y firewalld (o equivalente)"
     exit 1
 fi
@@ -27,7 +27,7 @@ firewall-cmd --zone="$ZONA_ACTIVA" --list-all
 echo "--------------------------------------------------"
 
 echo "INFO: Aplicando política restrictiva..."
-SERVICIOS_A_REMOVER=("ftp" "telnet" "samba")
+SERVICIOS_A_REMOVER=("ftp" "telnet" "samba" "http" "https") # Añadir http/https si no son necesarios en servidor BD
 for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
     if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
         echo "  Removiendo servicio: $servicio"
@@ -35,7 +35,7 @@ for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
     fi
 done
 
-SERVICIOS_A_ASEGURAR=("ssh") # HTTP/HTTPS no suelen ser necesarios en un servidor de BD dedicado
+SERVICIOS_A_ASEGURAR=("ssh") # Solo SSH es esencial para administración
 for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
     if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
         echo "  Añadiendo servicio esencial: $servicio"
@@ -44,9 +44,14 @@ for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
 done
 
 for puerto_bd in "${PUERTOS_BD_ABIERTOS[@]}"; do
-    echo "  Permitiendo puerto de base de datos: $puerto_bd"
-    firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
+    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-port="$puerto_bd" &>/dev/null; then
+        echo "  Permitiendo puerto de base de datos: $puerto_bd"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
+    else
+        echo "  Puerto $puerto_bd ya permitido."
+    fi
 done
+
 
 echo "INFO: Recargando firewalld..."
 if firewall-cmd --reload; then
@@ -59,4 +64,4 @@ fi
 echo "INFO: Configuración final del firewall en zona '$ZONA_ACTIVA':"
 firewall-cmd --zone="$ZONA_ACTIVA" --list-all
 echo "--------------------------------------------------"
-echo "Configuración del firewall del servidor de BD completada."
+echo "✅ Configuración del firewall del servidor de BD completada."

@@ -10,9 +10,13 @@ ARCHIVOS_SENSIBLES=(
     "/etc/passwd:644:f"
     "/etc/group:644:f"
     "/root:700:d"
+    # Añadir aquí archivos/directorios específicos de la base de datos si se conocen.
+    # EJEMPLO:
+    # "/var/lib/mysql:700:d" # Directorio de datos de MySQL/MariaDB
+    # "/etc/my.cnf:600:f"     # Archivo de configuración principal de MySQL/MariaDB
 )
 
-echo "=== AJUSTE DE PERMISOS EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
+echo "=== AJUSTE DE PERMISOS CRÍTICOS EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
 echo "INFO: Ejecutando con privilegios de root."
 
 for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
@@ -22,7 +26,7 @@ for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
         echo "AVISO: El archivo o directorio '$item' no existe. Saltando."
         continue
     fi
-    
+
     perm_actual=$(stat -c "%a" "$item")
     echo "Verificando: $item (Actual: $perm_actual, Deseado: $perm_deseado)"
 
@@ -32,12 +36,14 @@ for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
             echo "    Permisos ajustados."
         else
             echo "    ERROR: Falló el ajuste de permisos para $item."
+            # No exit 1 aquí, para intentar ajustar los demás archivos.
         fi
     else
         echo "  Permisos para $item ya son correctos ($perm_actual)."
     fi
     
-    if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi # NO SUDO aquí
+    # Mostrar permisos después del intento de ajuste (sin sudo aquí)
+    if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi
     echo "---"
 done
-echo "Ajuste de permisos completado."
+echo "✅ Ajuste de permisos completado."

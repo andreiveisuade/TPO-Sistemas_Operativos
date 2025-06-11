@@ -1,74 +1,42 @@
 #!/bin/bash
+# Usamos bash como intérprete del script
+
 set -u
+# Hace que el script termine si se usa una variable no definida (mejor para evitar errores silenciosos)
 
-# ===== FUNCIONES AUXILIARES =====
-mostrar_ayuda() {
-    echo "Uso: $0 <ip_servidor_objetivo>"
-    echo "Ejemplo: $0 192.168.1.100"
-    exit 1
-}
+MAQUINA_TARGET="$1"
+# Toma el primer argumento del script: la IP o nombre de la máquina objetivo
 
-# Validar parámetros
-if [ $# -ne 1 ]; then
-    echo "Error: Se requiere la dirección IP del servidor objetivo como parámetro."
-    mostrar_ayuda
-fi
-
-IP_SERVIDOR_OBJETIVO="$1" # Renombrado para más claridad
-
-if [[ ! $IP_SERVIDOR_OBJETIVO =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-    echo "Error: El formato de la IP '$IP_SERVIDOR_OBJETIVO' no es válido."
-    mostrar_ayuda
-fi
-
-# ===== CONFIGURACIÓN INICIAL =====
 LOG_DIR="./logs_auditoria"
+# Directorio donde se guardarán los archivos de log
+
 mkdir -p "$LOG_DIR"
 FECHA=$(date +"%Y%m%d_%H%M%S")
-NOMBRE_MAQUINA_ACTUAL=$(hostname) # Máquina desde donde se ejecuta la auditoría
-LOG="${LOG_DIR}/auditoria_Fase1_${NOMBRE_MAQUINA_ACTUAL}_to_${IP_SERVIDOR_OBJETIVO}_${FECHA}.txt"
+MAQUINA_ACTUAL=$(hostname)
+LOG="${LOG_DIR}/auditoria_Fase1_${MAQUINA_ACTUAL}_to_${MAQUINA_TARGET}_${FECHA}.txt"
 
-# Iniciar el archivo de log
+# Inicio de auditoría
 echo "INICIO DE AUDITORÍA (Fase 1 - Escaneo Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
-echo "Ejecutada desde: $NOMBRE_MAQUINA_ACTUAL" >> "$LOG"
-echo "Servidor Objetivo: $IP_SERVIDOR_OBJETIVO" >> "$LOG"
+echo "Ejecutada desde: $MAQUINA_ACTUAL" >> "$LOG"
+echo "Servidor de Base de Datos Objetivo: $MAQUINA_TARGET" >> "$LOG"
 echo "----------------------------------------------------------" >> "$LOG"
 echo "" >> "$LOG"
 
-# ===== EJECUCIÓN DE SCRIPTS DE AUDITORÍA =====
 SCRIPTS_DIR_FASE1="./scripts/fase1"
-if [ ! -d "$SCRIPTS_DIR_FASE1" ]; then
-    echo "Error: No se encontró el directorio de scripts '$SCRIPTS_DIR_FASE1'" | tee -a "$LOG"
-    exit 1
-fi
+# Carpeta donde se encuentran los scripts de la fase 1 de auditoría
 
 SCRIPT_ESCANEAR="${SCRIPTS_DIR_FASE1}/01_escanear.sh"
-SCRIPTS_FALLIDOS=0
+# Ruta completa al script de escaneo remoto
 
-if [ -f "$SCRIPT_ESCANEAR" ]; then
-    echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $IP_SERVIDOR_OBJETIVO ==" | tee -a "$LOG"
-    # Ejecutar script y redirigir toda su salida al log
-    bash "$SCRIPT_ESCANEAR" "$IP_SERVIDOR_OBJETIVO" >> "$LOG" 2>&1
-    if [ $? -ne 0 ]; then
-        echo "ERROR al ejecutar $(basename "$SCRIPT_ESCANEAR")" | tee -a "$LOG"
-        SCRIPTS_FALLIDOS=1
-    else
-        echo "$(basename "$SCRIPT_ESCANEAR") completado" | tee -a "$LOG"
-    fi
-    echo "" >> "$LOG"
-else
-    echo "Advertencia: No se encontró el script $SCRIPT_ESCANEAR" | tee -a "$LOG"
-    SCRIPTS_FALLIDOS=1
-fi
+echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $MAQUINA_TARGET ==" | tee -a "$LOG"
+# Imprime y registra en el log qué script se está ejecutando y para qué máquina
 
-# ===== FINALIZACIÓN =====
+bash "$SCRIPT_ESCANEAR" "$MAQUINA_TARGET" >> "$LOG" 2>&1
+# Ejecuta el script de escaneo y guarda toda su salida (stdout + stderr) en el log
+
+echo "$(basename "$SCRIPT_ESCANEAR") finalizado." | tee -a "$LOG"
+echo "" >> "$LOG"
 echo "----------------------------------------------------------" >> "$LOG"
-echo "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG"
-if [ $SCRIPTS_FALLIDOS -ne 0 ]; then
-    echo "ATENCIÓN: La Fase 1 de auditoría finalizó con errores." | tee -a "$LOG"
-fi
-echo "Log de Fase 1 guardado en: $LOG"
-echo "Auditoría Fase 1 completada. Ver resultados en: $LOG"
-if [ $SCRIPTS_FALLIDOS -ne 0 ]; then echo "ATENCIÓN: Hubo errores durante la Fase 1."; fi
+echo -e "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')\nLog de Fase 1 guardado en: $LOG\nAuditoría Fase 1 completada. Ver resultados en: $LOG" | tee -a "$LOG"
 
-exit $SCRIPTS_FALLIDOS
+exit 0

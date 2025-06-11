@@ -58,6 +58,18 @@ chmod +x scripts/02_configurar_firewall.sh
 chmod +x scripts/03_ajustar_permisos.sh
 ```
 
+### Escaner la red con nmap
+
+```bash
+nmap -sn 172.25.250.0/24
+nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}'
+```
+
+El argumento -sn significa hacer un "ping" a la red, es decir que no hará escaneo de puertos, solo hará un escaneo de red para ver si hay dispositivos conectados.
+
+La notación 172.25.250.0/24 define una red con máscara de 24 bits (255.255.255.0), lo cual significa que abarca las IPs desde 172.25.250.0 hasta 172.25.250.255.
+Sin embargo, las direcciones .0 (red) y .255 (broadcast) no pueden asignarse a dispositivos. Por lo tanto, los hosts válidos están entre 172.25.250.1 y 172.25.250.254.
+
 
 ### Paso 5 Ejecutar Fase 1 - Escaneo remoto
 
@@ -90,3 +102,14 @@ Esto realizará el endurecimiento remoto y generará un reporte en `workstation`
 
 
 xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5
+
+
+git clone https://github.com/andreiveisuade/TPO-Sistemas_Operativos.git
+
+nmap -sn 172.25.250.0/24
+
+nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}'
+
+./auditoria_fase1.sh $(nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}')
+
+set relativenumber # Habilita el número relativo de las líneas en vim
