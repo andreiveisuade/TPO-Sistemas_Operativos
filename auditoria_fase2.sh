@@ -56,7 +56,7 @@ for script_local in "${SCRIPTS_A_EJECUTAR_REMOTO[@]}"; do
 done
 
 echo "-----------------------------------------------------------------------" | tee -a "$LOG"
-echo "✅ Fase 2 de endurecimiento remoto (intentada) finalizada." | tee -a "$LOG"
+echo "✅ Fase 2 de endurecimiento intentada finalizada." | tee -a "$LOG"
 echo "=======================================================================" | tee -a "$LOG"
 echo "" >> "$LOG"
 echo "FIN DE AUDITORÍA (Fase 2): $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG"
