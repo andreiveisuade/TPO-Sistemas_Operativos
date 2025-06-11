@@ -5,7 +5,7 @@ set -u
 # Hace que el script termine si se usa una variable no definida (mejor para evitar errores silenciosos)
 
 MAQUINA_TARGET="$1"
-# Toma el primer argumento del script: la IP o nombre de la máquina objetivo
+
 
 LOG_DIR="./logs_auditoria"
 # Directorio donde se guardarán los archivos de log
@@ -28,15 +28,28 @@ SCRIPTS_DIR_FASE1="./scripts/fase1"
 SCRIPT_ESCANEAR="${SCRIPTS_DIR_FASE1}/01_escanear.sh"
 # Ruta completa al script de escaneo remoto
 
+# Verificar si el script de escaneo existe
+if [ ! -f "$SCRIPT_ESCANEAR" ]; then
+    echo "ERROR: No se encontró el script de escaneo de Fase 1: '$SCRIPT_ESCANEAR'" | tee -a "$LOG" >&2
+    echo "FIN DE AUDITORÍA (Fase 1) con error." | tee -a "$LOG" >&2
+    exit 1
+fi
+
+
 echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $MAQUINA_TARGET ==" | tee -a "$LOG"
 # Imprime y registra en el log qué script se está ejecutando y para qué máquina
 
-bash "$SCRIPT_ESCANEAR" "$MAQUINA_TARGET" >> "$LOG" 2>&1
 # Ejecuta el script de escaneo y guarda toda su salida (stdout + stderr) en el log
+# tee -a aquí para que la salida también se muestre en la consola
+if bash "$SCRIPT_ESCANEAR" "$MAQUINA_TARGET" | tee -a "$LOG"; then
+    echo "$(basename "$SCRIPT_ESCANEAR") finalizado con éxito." | tee -a "$LOG"
+    exit 0
+else
+    echo "$(basename "$SCRIPT_ESCANEAR") finalizó con errores. Revisar log." | tee -a "$LOG" >&2
+    exit 1
+fi
 
-echo "$(basename "$SCRIPT_ESCANEAR") finalizado." | tee -a "$LOG"
+
 echo "" >> "$LOG"
 echo "----------------------------------------------------------" >> "$LOG"
 echo -e "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')\nLog de Fase 1 guardado en: $LOG\nAuditoría Fase 1 completada. Ver resultados en: $LOG" | tee -a "$LOG"
-
-exit 0
