@@ -2,6 +2,10 @@
 
 # Ajusta permisos de archivos y directorios críticos.
 
+echo "========== AJUSTE DE PERMISOS =========="
+echo "Hostname: $(hostname)"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
 # Permisos para archivos de contraseñas y configuración de BD
 chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
 

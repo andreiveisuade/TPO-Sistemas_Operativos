@@ -2,14 +2,18 @@
 
 # Muestra información básica sobre servicios y conexiones locales
 
-echo "[+] Servicios habilitados al arranque"
+echo "========== AUDITORÍA DE SERVICIOS Y CONEXIONES =========="
+echo "Hostname: $(hostname)"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+echo -e "\n[+] Servicios habilitados al arranque"
 systemctl list-unit-files --type=service --state=enabled
 
-echo "[+] Servicios en ejecución"
+echo -e "\n[+] Servicios en ejecución"
 systemctl list-units --type=service --state=running
 
-echo "[+] Conexiones activas"
+echo -e "\n[+] Conexiones activas (ESTABLISHED)"
 ss -tulnp | grep ESTAB
 
-echo "[+] Puertos escuchando"
+echo -e "\n[+] Puertos escuchando (LISTEN)"
 ss -tulnp | grep LISTEN

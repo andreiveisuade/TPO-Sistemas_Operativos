@@ -1,0 +1,82 @@
+==================================================
+=== REPORTE DE ANÁLISIS DE CÓDIGO ===
+Proyecto: fase2
+Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2
+Generado el: Thu Jun 12 11:20:23 -03 2025
+==================================================
+
+--- INFORMACIÓN DEL REPOSITORIO GIT ---
+No se encontró un directorio .git en '/Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2'.
+---
+
+--- ESTRUCTURA DEL DIRECTORIO ---
+.
+├── 01_auditar_inicial_bd.sh
+├── 02_configurar_firewall.sh
+└── 03_ajustar_permisos.sh
+
+1 directory, 3 files
+---
+
+
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/01_auditar_inicial_bd.sh 
+
+#!/bin/bash
+
+# Muestra información básica sobre servicios y conexiones locales
+
+echo "[+] Servicios habilitados al arranque"
+systemctl list-unit-files --type=service --state=enabled
+
+echo "[+] Servicios en ejecución"
+systemctl list-units --type=service --state=running
+
+echo "[+] Conexiones activas"
+ss -tulnp | grep ESTAB
+
+echo "[+] Puertos escuchando"
+ss -tulnp | grep LISTEN
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/02_configurar_firewall.sh 
+
+#!/bin/bash
+
+# Activa el firewall y aplica una política estricta: solo lo esencial.
+
+# Asegura que firewalld esté activo, pero no da error si ya lo estaba.
+systemctl enable --now firewalld > /dev/null 2>&1
+
+# Eliminar servicios innecesarios
+
+# Basado en el hallazgo de Fase 1, cerramos explícitamente http/https.
+firewall-cmd --permanent --remove-service=http > /dev/null 2>&1
+firewall-cmd --permanent --remove-service=https > /dev/null 2>&1
+
+# Añadir solo los servicios/puertos requeridos
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-port=3306/tcp
+
+# Recargar para aplicar todos los cambios
+firewall-cmd --reload
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/03_ajustar_permisos.sh 
+
+#!/bin/bash
+
+# Ajusta permisos de archivos y directorios críticos.
+
+# Permisos para archivos de contraseñas y configuración de BD
+chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
+
+# Permisos para archivos de usuarios/grupos
+chmod 644 /etc/passwd /etc/group
+
+# Permisos para directorios sensibles (root y datos de BD)
+chmod 700 /root /var/lib/mysql
+==================================================
+=== FIN DEL REPORTE ===
+==================================================
