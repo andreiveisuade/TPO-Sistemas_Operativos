@@ -2,12 +2,12 @@
 === REPORTE DE ANÁLISIS DE CÓDIGO ===
 Proyecto: auditoria-redhat
 Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat
-Generado el: Wed Jun 11 20:59:03 -03 2025
+Generado el: Thu Jun 12 10:01:05 -03 2025
 ==================================================
 
 --- INFORMACIÓN DEL REPOSITORIO GIT ---
 Rama actual: main
-Último commit: 506c68d - Entrega FINAL TPO Ejercicio 6_1 (andreiveisuade, 60 minutes ago)
+Último commit: da79d66 - Revert "Version simplificada" (andreiveisuade, 4 minutes ago)
 ---
 
 --- ESTRUCTURA DEL DIRECTORIO ---
@@ -92,76 +92,29 @@ echo -e "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')\nLog de Fas
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_fase2.sh 
 
-
 #!/bin/bash
 # Script a ejecutar en WORKSTATION para ejecutar scripts de endurecimiento en un SERVIDOR REMOTO (BD)
 set -u
 
-USUARIO_REMOTO="$1"
-MAQUINA_TARGET="$2"
-
+USER="$1"
+TARGET="$2"
+FECHA=$(date +"%Y%m%d_%H%M%S")
+HOST=$(hostname)
 LOG_DIR="./logs_auditoria"
 mkdir -p "$LOG_DIR"
-FECHA=$(date +"%Y%m%d_%H%M%S")
-MAQUINA_ACTUAL=$(hostname)
-LOG="${LOG_DIR}/auditoria_Fase2_${MAQUINA_ACTUAL}_on_${MAQUINA_TARGET}_${FECHA}.txt"
+LOG="${LOG_DIR}/fase2_${HOST}_to_${TARGET}_${FECHA}.log"
 
-DIR_SCRIPTS_FASE2_LOCAL="./scripts/fase2"
+SCRIPTS=(01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh)
 
-echo "INICIO DE AUDITORÍA (Fase 2 - Endurecimiento Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
-echo "Ejecutada desde: $MAQUINA_ACTUAL" >> "$LOG"
-echo "Servidor Objetivo para Endurecimiento: $MAQUINA_TARGET" >> "$LOG"
-echo "Usuario Remoto para ejecución: $USUARIO_REMOTO" >> "$LOG"
-echo "NOTA: Se solicitará la contraseña de '$USUARIO_REMOTO' en '$MAQUINA_TARGET' para los comandos sudo." >> "$LOG"
-echo "----------------------------------------------------------" >> "$LOG"
-echo "" >> "$LOG"
+for script in "${SCRIPTS[@]}"; do
+  PATH_LOCAL="./scripts/fase2/$script"
+  [[ -f "$PATH_LOCAL" ]] || { echo "No existe $PATH_LOCAL"; continue; }
 
-echo "=======================================================================" | tee -a "$LOG"
-echo "=== INICIO DE FASE 2: Endurecimiento Remoto en $MAQUINA_TARGET ===" | tee -a "$LOG"
-echo "=======================================================================" | tee -a "$LOG"
-
-SCRIPTS_A_EJECUTAR_REMOTO=(
-    "${DIR_SCRIPTS_FASE2_LOCAL}/01_auditar_inicial_bd.sh" # Nuevo script para checks iniciales en BD
-    "${DIR_SCRIPTS_FASE2_LOCAL}/02_configurar_firewall.sh"
-    "${DIR_SCRIPTS_FASE2_LOCAL}/03_ajustar_permisos.sh"
-)
-SCRIPTS_FALLIDOS=0
-
-for script_local in "${SCRIPTS_A_EJECUTAR_REMOTO[@]}"; do
-    script_nombre_remoto=$(basename "$script_local")
-    echo "-----------------------------------------------------------------------" | tee -a "$LOG"
-    echo "Ejecutando $script_nombre_remoto en $MAQUINA_TARGET..." | tee -a "$LOG"
-    
-    if [ ! -f "$script_local" ]; then
-        echo "ERROR: No se encontró el script local '$script_local'. Saltando." | tee -a "$LOG"
-        SCRIPTS_FALLIDOS=$((SCRIPTS_FALLIDOS + 1))
-        continue
-    fi
-
-    # Se pasa el contenido del script local al stdin de 'sudo bash -s' en el host remoto
-    # ssh -t es esencial para que sudo pueda pedir la contraseña
-    echo "  (Salida del script remoto será logueada en $LOG)" | tee -a "$LOG"
-    if cat "$script_local" | ssh -t "$USUARIO_REMOTO@$MAQUINA_TARGET" "sudo bash -s" >> "$LOG" 2>&1; then
-        echo "  $script_nombre_remoto ejecutado remotamente con éxito." | tee -a "$LOG"
-    else
-        echo "  ERROR: Hubo un problema al ejecutar $script_nombre_remoto remotamente. Revisar log." | tee -a "$LOG"
-        SCRIPTS_FALLIDOS=$((SCRIPTS_FALLIDOS + 1))
-    fi
+  echo "[+] Ejecutando $script en $TARGET" | tee -a "$LOG"
+  ssh -t "$USER@$TARGET" "sudo bash -s" < "$PATH_LOCAL" >> "$LOG" 2>&1 \
+    && echo "[OK] $script" | tee -a "$LOG" \
+    || echo "[ERROR] $script" | tee -a "$LOG"
 done
-
-echo "-----------------------------------------------------------------------" | tee -a "$LOG"
-echo "✅ Fase 2 de endurecimiento intentada finalizada." | tee -a "$LOG"
-echo "=======================================================================" | tee -a "$LOG"
-echo "" >> "$LOG"
-echo "FIN DE AUDITORÍA (Fase 2): $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG"
-if [ $SCRIPTS_FALLIDOS -ne 0 ]; then
-    echo "ATENCIÓN: La Fase 2 de auditoría finalizó con $SCRIPTS_FALLIDOS error(es)." | tee -a "$LOG"
-fi
-echo "Log de Fase 2 guardado en: $LOG" | tee -a "$LOG"
-echo "Auditoría Fase 2 completada. Ver resultados en: $LOG"
-if [ $SCRIPTS_FALLIDOS -ne 0 ]; then echo "ATENCIÓN: Hubo errores durante la Fase 2."; fi
-
-exit $SCRIPTS_FALLIDOS
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/consigna.md 
@@ -320,21 +273,79 @@ set relativenumber # Habilita el número relativo de las líneas en vim
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase1/01_escanear.sh 
 
 #!/bin/bash
+# Script para realizar un escaneo de seguridad REMOTA del servidor objetivo.
+# Realiza un análisis de puertos abiertos y servicios en ejecución en un servidor remoto.
+#
+# Requisitos:
+# El comando nmap debe estar instalado previamente en el sistema
+
 set -u
+# Hace que el script termine si se usa una variable no definida
 
-TARGET="$1"
-[[ -n "$TARGET" ]] || { echo "Falta argumento TARGET"; exit 1; }
+# --- Configuración inicial ---
+MAQUINA_TARGET="$1"  # IP o hostname del servidor objetivo
 
-echo "[*] Verificando conectividad con $TARGET..."
-ping -c1 -W1 "$TARGET" &>/dev/null || { echo "No hay conectividad"; exit 1; }
+# Verificar que se recibió un argumento (aunque el script principal ya lo hace, buena práctica)
+if [ -z "$MAQUINA_TARGET" ]; then
+    echo "ERROR: No se recibió el argumento de máquina objetivo en el script de escaneo." >&2
+    exit 1
+fi
 
-echo "[+] Escaneo rápido de puertos (-F)"
-nmap -F "$TARGET" || echo "[!] Falló escaneo rápido"
+FECHA_ESCANEO=$(date +"%Y%m%d_%H%M%S")
+MAQUINA_EJECUTORA=$(hostname)
 
-echo "[+] Escaneo detallado de servicios (-sV)"
-nmap -sV "$TARGET" || echo "[!] Falló escaneo detallado"
+# Verificar que nmap esté instalado
+if ! command -v nmap &> /dev/null; then
+    echo "ERROR: nmap no está instalado. Por favor instálalo manualmente." >&2
+    exit 1
+fi
 
-echo "[✓] Escaneo finalizado"
+echo "=== INICIANDO ESCANEO REMOTO DE SEGURIDAD ==="
+echo "Objetivo de Escaneo: $MAQUINA_TARGET"
+echo "Ejecutado desde: $MAQUINA_EJECUTORA"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+echo "---------------------------------------------"
+
+# --- Verificación de conectividad ---
+echo -e "\n[+] Verificando conectividad con $MAQUINA_TARGET..."
+# Usamos ping con 1 paquete (-c 1) y timeout de 1 segundo (-W 1)
+if ping -c 1 -W 1 "$MAQUINA_TARGET" &> /dev/null; then
+    echo "  Conectividad OK."
+else
+    echo "ERROR: No se puede alcanzar la máquina objetivo '$MAQUINA_TARGET'." >&2
+    echo "Verifica la IP/hostname y la conectividad de red." >&2
+    exit 1 # Salir si no hay conectividad
+fi
+echo "---------------------------------------------"
+
+
+# --- Escaneo rápido de puertos ---
+# Realiza un escaneo rápido de los 100 puertos TCP más comunes en el objetivo.
+#   -F: Escaneo rápido (Fast) - Escanea solo los 100 puertos más comunes
+echo -e "\n[+] Iniciando escaneo rápido de puertos TCP más comunes (-F)..."
+# Capturamos el estado de salida de nmap
+if ! nmap -F "$MAQUINA_TARGET"; then
+    echo "ERROR: Falló el escaneo rápido de puertos." >&2
+    # No salimos aquí, intentamos el siguiente escaneo si es posible
+fi
+
+# --- Escaneo detallado de servicios ---
+# Realiza un escaneo más exhaustivo para detectar versiones de servicios en puertos abiertos.
+#   -sV: Detección de versiones - Determina la versión de los servicios encontrados. De esta manera se puede identificar el tipo de servicio y su versión para actualizarlos y evitar vulnerabilidades.
+#   Este escaneo es más lento pero proporciona información valiosa sobre los servicios
+
+echo -e "\n[+] Detectando servicios y versiones en puertos abiertos (-sV)..."
+if ! nmap -sV "$MAQUINA_TARGET"; then
+    echo "ERROR: Falló la detección de servicios." >&2
+    # No salimos aquí, permitimos que finalice el script
+fi
+
+echo -e "\n[+] Auditoría de red remota (escaneo de $MAQUINA_TARGET) finalizada."
+
+# El script de escaneo finaliza siempre con éxito (exit 0) a menos que falle la conectividad
+# o nmap no esté instalado. Los fallos de los escaneos individuales se reportan como ERROR
+# pero no detienen el script a menos que sea un fallo fundamental.
+exit 0
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/01_auditar_inicial_bd.sh 
@@ -370,7 +381,6 @@ echo "---"
 
 echo "✅ Auditoría inicial de servicios y conexiones completada ✅"
 
-
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/02_configurar_firewall.sh 
 
@@ -380,130 +390,56 @@ echo "✅ Auditoría inicial de servicios y conexiones completada ✅"
 set -u
 set -e
 
-# <--- MODIFICACIÓN: Se ha añadido un comentario para justificar esta configuración ---
-# El escaneo de Fase 1 confirmó que el servicio MySQL/MariaDB está en el puerto 3306.
-# Este es el único puerto de aplicación que dejaremos abierto.
-PUERTOS_BD_ABIERTOS=("3306/tcp") 
+PUERTOS_BD_ABIERTOS=("3306/tcp")
+SERVICIOS_A_REMOVER=("http" "https" "ftp" "telnet" "samba")
 
-echo "=== CONFIGURACIÓN DE FIREWALL EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
-echo "INFO: Ejecutando con privilegios de root."
+[[ -x "$(command -v firewall-cmd)" ]] || { echo "No está firewalld"; exit 1; }
+systemctl enable --now firewalld
 
-if ! command -v firewall-cmd &> /dev/null; then
-    echo "ERROR: firewalld no está instalado. Instalar con: dnf install -y firewalld (o equivalente)"
-    exit 1
-fi
+ZONA=$(firewall-cmd --get-default-zone)
+echo "[*] Configurando zona: $ZONA"
 
-if ! systemctl is-active --quiet firewalld; then
-    echo "INFO: firewalld no está activo. Intentando iniciar y habilitar..."
-    systemctl enable --now firewalld || { echo "ERROR: No se pudo iniciar firewalld."; exit 1; }
-fi
-
-ZONA_ACTIVA=$(firewall-cmd --get-default-zone)
-echo "INFO: Se aplicarán reglas a la zona por defecto: $ZONA_ACTIVA"
-
-echo "INFO: Estado actual del firewall en zona '$ZONA_ACTIVA':"
-firewall-cmd --zone="$ZONA_ACTIVA" --list-all
-echo "--------------------------------------------------"
-
-echo "INFO: Aplicando política restrictiva..."
-# <--- MODIFICACIÓN: Comentario añadido para explicar la selección de servicios a remover ---
-# Basado en el escaneo de Fase 1, los servicios http y https (puertos 80 y 443) estaban abiertos.
-# Estos servicios son innecesarios y representan un riesgo en un servidor de BD dedicado.
-# Los incluimos aquí junto con otros servicios comúnmente inseguros para asegurarnos de que el firewall los bloquee.
-SERVICIOS_A_REMOVER=("ftp" "telnet" "samba" "http" "https") 
-for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
-    if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
-        echo "  Removiendo servicio innecesario/inseguro: $servicio"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --remove-service="$servicio"
-    fi
+for s in "${SERVICIOS_A_REMOVER[@]}"; do
+  firewall-cmd --permanent --zone="$ZONA" --remove-service="$s" 2>/dev/null || true
 done
 
-# <--- SIN MODIFICACIÓN: Se mantiene ssh como servicio esencial para la administración ---
-SERVICIOS_A_ASEGURAR=("ssh") 
-for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
-    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
-        echo "  Añadiendo servicio esencial: $servicio"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-service="$servicio"
-    fi
+firewall-cmd --permanent --zone="$ZONA" --add-service=ssh
+
+for p in "${PUERTOS_BD_ABIERTOS[@]}"; do
+  firewall-cmd --permanent --zone="$ZONA" --add-port="$p"
 done
 
-for puerto_bd in "${PUERTOS_BD_ABIERTOS[@]}"; do
-    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-port="$puerto_bd" &>/dev/null; then
-        echo "  Permitiendo puerto de base de datos: $puerto_bd"
-        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
-    else
-        echo "  Puerto de base de datos $puerto_bd ya permitido."
-    fi
-done
-
-
-echo "INFO: Recargando firewalld para aplicar las nuevas reglas..."
-if firewall-cmd --reload; then
-    echo "INFO: Firewall recargado."
-else
-    echo "ERROR: Falló la recarga del firewall."
-    exit 1
-fi
-
-echo "INFO: Configuración final del firewall en zona '$ZONA_ACTIVA':"
-firewall-cmd --zone="$ZONA_ACTIVA" --list-all
-echo "--------------------------------------------------"
-echo "✅ Configuración del firewall del servidor de BD completada ✅"
-
+firewall-cmd --reload
+firewall-cmd --zone="$ZONA" --list-all
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/03_ajustar_permisos.sh 
 
 #!/bin/bash
-# Script para ajustar permisos en el SERVIDOR DE BASE DE DATOS
-# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
-set -u
-set -e
+set -eu
 
-# <--- MODIFICACIÓN: Activamos las reglas para MySQL/MariaDB y añadimos comentarios ---
-# Basado en el escaneo de Fase 1, se detectó un servidor MySQL/MariaDB.
-# Por lo tanto, se activan estas reglas para asegurar los archivos de configuración y datos.
-ARCHIVOS_SENSIBLES=(
-    "/etc/shadow:600:f"
-    "/etc/gshadow:600:f"
-    "/etc/passwd:644:f"
-    "/etc/group:644:f"
-    "/root:700:d"
-    # Reglas específicas para MySQL/MariaDB activadas:
-    "/var/lib/mysql:700:d"     # Directorio de datos de MySQL/MariaDB
-    "/etc/my.cnf:600:f"        # Archivo de configuración principal de MySQL/MariaDB
+ARCHIVOS=(
+  "/etc/shadow:600"
+  "/etc/gshadow:600"
+  "/etc/passwd:644"
+  "/etc/group:644"
+  "/root:700"
+  "/var/lib/mysql:700"
+  "/etc/my.cnf:600"
 )
 
-echo "=== AJUSTE DE PERMISOS CRÍTICOS EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
-echo "INFO: Ejecutando con privilegios de root."
+for item in "${ARCHIVOS[@]}"; do
+  path="${item%%:*}"
+  perm="${item##*:}"
+  [[ -e "$path" ]] || { echo "No existe $path"; continue; }
 
-for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
-    IFS=':' read -r item perm_deseado tipo <<< "$item_perm_tipo"
-    
-    if [ ! -e "$item" ]; then
-        echo "AVISO: El archivo o directorio '$item' no existe. Saltando."
-        continue
-    fi
-
-    perm_actual=$(stat -c "%a" "$item")
-    echo "Verificando: $item (Actual: $perm_actual, Deseado: $perm_deseado)"
-
-    if [ "$perm_actual" != "$perm_deseado" ]; then
-        echo "  Ajustando permisos de '$item' de $perm_actual a $perm_deseado..."
-        if chmod "$perm_deseado" "$item"; then
-            echo "    Permisos ajustados."
-        else
-            echo "    ERROR: Falló el ajuste de permisos para '$item'."
-        fi
-    else
-        echo "  Permisos para '$item' ya son correctos ($perm_actual)."
-    fi
-    
-    # Mostrar permisos después del intento de ajuste
-    if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi
-    echo "---"
+  actual=$(stat -c "%a" "$path")
+  if [ "$actual" != "$perm" ]; then
+    chmod "$perm" "$path" && echo "✔ $path → $perm"
+  else
+    echo "✓ $path ya tiene permisos correctos"
+  fi
 done
-echo "✅ Ajuste de permisos completado ✅"
 ==================================================
 === FIN DEL REPORTE ===
 ==================================================

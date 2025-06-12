@@ -1,23 +1,21 @@
 #!/bin/bash
-# Script a ejecutar en WORKSTATION para ejecutar scripts de endurecimiento en un SERVIDOR REMOTO (BD)
-set -u
 
+# Argumentos: usuario SSH y máquina destino
 USER="$1"
 TARGET="$2"
-FECHA=$(date +"%Y%m%d_%H%M%S")
-HOST=$(hostname)
+
+# Carpeta y archivo de log
 LOG_DIR="./logs_auditoria"
 mkdir -p "$LOG_DIR"
-LOG="${LOG_DIR}/fase2_${HOST}_to_${TARGET}_${FECHA}.log"
+FECHA=$(date +"%Y%m%d_%H%M%S")
+LOG="$LOG_DIR/fase2_$(hostname)_to_${TARGET}_$FECHA.log"
 
-SCRIPTS=(01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh)
+echo "[+] Iniciando auditoria_fase2.sh" | tee -a "$LOG"
 
-for script in "${SCRIPTS[@]}"; do
-  PATH_LOCAL="./scripts/fase2/$script"
-  [[ -f "$PATH_LOCAL" ]] || { echo "No existe $PATH_LOCAL"; continue; }
-
-  echo "[+] Ejecutando $script en $TARGET" | tee -a "$LOG"
-  ssh -t "$USER@$TARGET" "sudo bash -s" < "$PATH_LOCAL" >> "$LOG" 2>&1 \
-    && echo "[OK] $script" | tee -a "$LOG" \
-    || echo "[ERROR] $script" | tee -a "$LOG"
+# Ejecuta los scripts de endurecimiento en el servidor remoto
+for s in 01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh; do
+  echo "[+] Ejecutando $s" | tee -a "$LOG"
+  ssh -t "$USER@$TARGET" "sudo bash -s" < "./scripts/fase2/$s" | tee -a "$LOG"
 done
+
+echo "[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
