@@ -1,0 +1,509 @@
+==================================================
+=== REPORTE DE ANÁLISIS DE CÓDIGO ===
+Proyecto: auditoria-redhat
+Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat
+Generado el: Wed Jun 11 20:59:03 -03 2025
+==================================================
+
+--- INFORMACIÓN DEL REPOSITORIO GIT ---
+Rama actual: main
+Último commit: 506c68d - Entrega FINAL TPO Ejercicio 6_1 (andreiveisuade, 60 minutes ago)
+---
+
+--- ESTRUCTURA DEL DIRECTORIO ---
+.
+├── auditoria_fase1.sh
+├── auditoria_fase2.sh
+├── consigna.md
+├── dar_permisos.sh
+├── guia_de_ejecucion.md
+└── scripts
+    ├── fase1
+    │   └── 01_escanear.sh
+    └── fase2
+        ├── 01_auditar_inicial_bd.sh
+        ├── 02_configurar_firewall.sh
+        └── 03_ajustar_permisos.sh
+
+4 directories, 9 files
+---
+
+
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_fase1.sh 
+
+#!/bin/bash
+# Usamos bash como intérprete del script
+
+set -u
+# Hace que el script termine si se usa una variable no definida (mejor para evitar errores silenciosos)
+
+MAQUINA_TARGET="$1"
+
+
+LOG_DIR="./logs_auditoria"
+# Directorio donde se guardarán los archivos de log
+
+mkdir -p "$LOG_DIR"
+FECHA=$(date +"%Y%m%d_%H%M%S")
+MAQUINA_ACTUAL=$(hostname)
+LOG="${LOG_DIR}/auditoria_Fase1_${MAQUINA_ACTUAL}_to_${MAQUINA_TARGET}_${FECHA}.txt"
+
+# Inicio de auditoría
+echo "INICIO DE AUDITORÍA (Fase 1 - Escaneo Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
+echo "Ejecutada desde: $MAQUINA_ACTUAL" >> "$LOG"
+echo "Servidor de Base de Datos Objetivo: $MAQUINA_TARGET" >> "$LOG"
+echo "----------------------------------------------------------" >> "$LOG"
+echo "" >> "$LOG"
+
+SCRIPTS_DIR_FASE1="./scripts/fase1"
+# Carpeta donde se encuentran los scripts de la fase 1 de auditoría
+
+SCRIPT_ESCANEAR="${SCRIPTS_DIR_FASE1}/01_escanear.sh"
+# Ruta completa al script de escaneo remoto
+
+# Verificar si el script de escaneo existe
+if [ ! -f "$SCRIPT_ESCANEAR" ]; then
+    echo "ERROR: No se encontró el script de escaneo de Fase 1: '$SCRIPT_ESCANEAR'" | tee -a "$LOG" >&2
+    echo "FIN DE AUDITORÍA (Fase 1) con error." | tee -a "$LOG" >&2
+    exit 1
+fi
+
+
+echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $MAQUINA_TARGET ==" | tee -a "$LOG"
+# Imprime y registra en el log qué script se está ejecutando y para qué máquina
+
+# Ejecuta el script de escaneo y guarda toda su salida (stdout + stderr) en el log
+# tee -a aquí para que la salida también se muestre en la consola
+if bash "$SCRIPT_ESCANEAR" "$MAQUINA_TARGET" | tee -a "$LOG"; then
+    echo "$(basename "$SCRIPT_ESCANEAR") finalizado con éxito." | tee -a "$LOG"
+    exit 0
+else
+    echo "$(basename "$SCRIPT_ESCANEAR") finalizó con errores. Revisar log." | tee -a "$LOG" >&2
+    exit 1
+fi
+
+
+echo "" >> "$LOG"
+echo "----------------------------------------------------------" >> "$LOG"
+echo -e "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')\nLog de Fase 1 guardado en: $LOG\nAuditoría Fase 1 completada. Ver resultados en: $LOG" | tee -a "$LOG"
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_fase2.sh 
+
+
+#!/bin/bash
+# Script a ejecutar en WORKSTATION para ejecutar scripts de endurecimiento en un SERVIDOR REMOTO (BD)
+set -u
+
+USUARIO_REMOTO="$1"
+MAQUINA_TARGET="$2"
+
+LOG_DIR="./logs_auditoria"
+mkdir -p "$LOG_DIR"
+FECHA=$(date +"%Y%m%d_%H%M%S")
+MAQUINA_ACTUAL=$(hostname)
+LOG="${LOG_DIR}/auditoria_Fase2_${MAQUINA_ACTUAL}_on_${MAQUINA_TARGET}_${FECHA}.txt"
+
+DIR_SCRIPTS_FASE2_LOCAL="./scripts/fase2"
+
+echo "INICIO DE AUDITORÍA (Fase 2 - Endurecimiento Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
+echo "Ejecutada desde: $MAQUINA_ACTUAL" >> "$LOG"
+echo "Servidor Objetivo para Endurecimiento: $MAQUINA_TARGET" >> "$LOG"
+echo "Usuario Remoto para ejecución: $USUARIO_REMOTO" >> "$LOG"
+echo "NOTA: Se solicitará la contraseña de '$USUARIO_REMOTO' en '$MAQUINA_TARGET' para los comandos sudo." >> "$LOG"
+echo "----------------------------------------------------------" >> "$LOG"
+echo "" >> "$LOG"
+
+echo "=======================================================================" | tee -a "$LOG"
+echo "=== INICIO DE FASE 2: Endurecimiento Remoto en $MAQUINA_TARGET ===" | tee -a "$LOG"
+echo "=======================================================================" | tee -a "$LOG"
+
+SCRIPTS_A_EJECUTAR_REMOTO=(
+    "${DIR_SCRIPTS_FASE2_LOCAL}/01_auditar_inicial_bd.sh" # Nuevo script para checks iniciales en BD
+    "${DIR_SCRIPTS_FASE2_LOCAL}/02_configurar_firewall.sh"
+    "${DIR_SCRIPTS_FASE2_LOCAL}/03_ajustar_permisos.sh"
+)
+SCRIPTS_FALLIDOS=0
+
+for script_local in "${SCRIPTS_A_EJECUTAR_REMOTO[@]}"; do
+    script_nombre_remoto=$(basename "$script_local")
+    echo "-----------------------------------------------------------------------" | tee -a "$LOG"
+    echo "Ejecutando $script_nombre_remoto en $MAQUINA_TARGET..." | tee -a "$LOG"
+    
+    if [ ! -f "$script_local" ]; then
+        echo "ERROR: No se encontró el script local '$script_local'. Saltando." | tee -a "$LOG"
+        SCRIPTS_FALLIDOS=$((SCRIPTS_FALLIDOS + 1))
+        continue
+    fi
+
+    # Se pasa el contenido del script local al stdin de 'sudo bash -s' en el host remoto
+    # ssh -t es esencial para que sudo pueda pedir la contraseña
+    echo "  (Salida del script remoto será logueada en $LOG)" | tee -a "$LOG"
+    if cat "$script_local" | ssh -t "$USUARIO_REMOTO@$MAQUINA_TARGET" "sudo bash -s" >> "$LOG" 2>&1; then
+        echo "  $script_nombre_remoto ejecutado remotamente con éxito." | tee -a "$LOG"
+    else
+        echo "  ERROR: Hubo un problema al ejecutar $script_nombre_remoto remotamente. Revisar log." | tee -a "$LOG"
+        SCRIPTS_FALLIDOS=$((SCRIPTS_FALLIDOS + 1))
+    fi
+done
+
+echo "-----------------------------------------------------------------------" | tee -a "$LOG"
+echo "✅ Fase 2 de endurecimiento intentada finalizada." | tee -a "$LOG"
+echo "=======================================================================" | tee -a "$LOG"
+echo "" >> "$LOG"
+echo "FIN DE AUDITORÍA (Fase 2): $(date '+%Y-%m-%d %H:%M:%S %Z')" >> "$LOG"
+if [ $SCRIPTS_FALLIDOS -ne 0 ]; then
+    echo "ATENCIÓN: La Fase 2 de auditoría finalizó con $SCRIPTS_FALLIDOS error(es)." | tee -a "$LOG"
+fi
+echo "Log de Fase 2 guardado en: $LOG" | tee -a "$LOG"
+echo "Auditoría Fase 2 completada. Ver resultados en: $LOG"
+if [ $SCRIPTS_FALLIDOS -ne 0 ]; then echo "ATENCIÓN: Hubo errores durante la Fase 2."; fi
+
+exit $SCRIPTS_FALLIDOS
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/consigna.md 
+
+# Unidad 6 - Trabajo Práctico
+
+## “Fortalecimiento del Servidor de Producción: Auditoría y Endurecimiento”
+
+### Planteamiento del Problema
+
+Una pequeña empresa ha desplegado recientemente dos servidores basados en Red Hat: uno para aplicaciones web y otro para base de datos. Ante la inminente conexión con el entorno público, el responsable de sistemas recibe la orden de realizar una auditoría de seguridad básica y aplicar medidas de endurecimiento del sistema operativo.
+
+### Se requiere:
+
+1. Escanear el servidor de base de datos desde el servidor de aplicaciones para identificar puertos abiertos.
+2. Limitar los servicios activos y aplicar reglas de firewall estrictas.
+3. Revisar y ajustar permisos de archivos y directorios sensibles.
+
+El objetivo es registrar todas las acciones en un archivo de log y automatizar parte del proceso con bash.
+
+### Objetivos de Seguridad Cubiertos
+
+- Mínima superficie de ataque (puertos/servicios).
+- Integridad del sistema de archivos y configuraciones.
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/dar_permisos.sh 
+
+#!/bin/bash
+
+chmod +x auditoria_fase1.sh
+chmod +x auditoria_fase2.sh
+chmod +x scripts/fase1/*.sh
+chmod +x scripts/fase2/*.sh
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/guia_de_ejecucion.md 
+
+# Guía de Ejecución Unidad 6 - Auditoría y Endurecimiento
+
+### Escenario
+
+* **workstation**: Servidor de aplicaciones. Ejecuta el escaneo remoto.
+* **utility**: Servidor de base de datos. Es el objetivo del escaneo y endurecimiento.
+
+---
+
+### Paso 1: Iniciar los servidores necesarios
+
+Desde el panel de Red Hat levantar y hacer **Open Console** de:
+
+- `workstation`
+- `utility`
+
+---
+
+### Paso 2: Acceder a la consola de `workstation`
+
+1. Clic en **Open Console** de `workstation`.
+2. Iniciar sesión como `student` (o el usuario asignado).
+
+---
+
+### Paso 2.1: Verificaciones previas
+
+1. Instalar `nmap` con:
+
+```bash
+sudo dnf install nmap
+```
+
+2. Verificar que `nmap` esta instalado con:
+
+```bash
+nmap --version
+```
+
+3. Hacer un `ip route` para verificar la ruta de red
+
+### Paso 3 Verificar conectividad con `utility`
+
+```bash
+ping 5 utility
+```
+
+Debe responder con paquetes recibidos.
+
+
+### Paso 4 Dar permisos de ejecución
+
+```bash
+chmod +x auditoria_fase1.sh
+chmod +x auditoria_fase2.sh
+chmod +x scripts/01_escanear.sh
+chmod +x scripts/02_configurar_firewall.sh
+chmod +x scripts/03_ajustar_permisos.sh
+```
+
+### Escaner la red con nmap
+
+```bash
+nmap -sn 172.25.250.0/24
+nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}'
+```
+
+El argumento -sn significa hacer un "ping" a la red, es decir que no hará escaneo de puertos, solo hará un escaneo de red para ver si hay dispositivos conectados.
+
+La notación 172.25.250.0/24 define una red con máscara de 24 bits (255.255.255.0), lo cual significa que abarca las IPs desde 172.25.250.0 hasta 172.25.250.255.
+Sin embargo, las direcciones .0 (red) y .255 (broadcast) no pueden asignarse a dispositivos. Por lo tanto, los hosts válidos están entre 172.25.250.1 y 172.25.250.254.
+
+
+### Paso 5 Ejecutar Fase 1 - Escaneo remoto
+
+Desde `workstation`, ejecutar:
+
+```bash
+bash ./auditoria_fase1.sh utility
+```
+
+Esto realizará el escaneo remoto y generará un reporte en `workstation` en la carpeta `reportes`.
+
+### Paso 6 Verificar acceso SSH a `utility`
+
+```bash
+ssh student@utility
+```
+
+Debe responder con la contraseña del usuario `student`.
+
+### Paso 7 Ejecutar Fase 2 - Endurecimiento
+
+Desde `workstation`, ejecutar:
+
+```bash
+bash ./auditoria_fase2.sh utility
+```
+
+Esto realizará el endurecimiento remoto y generará un reporte en `workstation` en la carpeta `reportes`.
+
+
+
+xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5
+
+
+git clone https://github.com/andreiveisuade/TPO-Sistemas_Operativos.git
+
+nmap -sn 172.25.250.0/24
+
+nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}'
+
+./auditoria_fase1.sh $(nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}')
+
+set relativenumber # Habilita el número relativo de las líneas en vim
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase1/01_escanear.sh 
+
+#!/bin/bash
+set -u
+
+TARGET="$1"
+[[ -n "$TARGET" ]] || { echo "Falta argumento TARGET"; exit 1; }
+
+echo "[*] Verificando conectividad con $TARGET..."
+ping -c1 -W1 "$TARGET" &>/dev/null || { echo "No hay conectividad"; exit 1; }
+
+echo "[+] Escaneo rápido de puertos (-F)"
+nmap -F "$TARGET" || echo "[!] Falló escaneo rápido"
+
+echo "[+] Escaneo detallado de servicios (-sV)"
+nmap -sV "$TARGET" || echo "[!] Falló escaneo detallado"
+
+echo "[✓] Escaneo finalizado"
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/01_auditar_inicial_bd.sh 
+
+#!/bin/bash
+# Script a ejecutar en el SERVIDOR DE BASE DE DATOS
+# Este script realiza una auditoría inicial de servicios y conexiones LOCALES.
+# Se ejecuta como root mediante "sudo bash -s" desde auditoria_fase2.sh.
+set -u
+set -e
+
+echo "=== AUDITORÍA INICIAL DE SERVICIOS Y CONEXIONES (en $(hostname)) ==="
+echo "INFO: Ejecutando con privilegios de root."
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+echo "------------------------------------------------------------------"
+
+echo -e "\n[+] Servicios habilitados para iniciar al arranque (systemctl --state=enabled):"
+systemctl list-unit-files --type=service --state=enabled --no-pager | awk '{print "  " $1, $2}' | grep -vE '^UNIT|^$'
+echo "---"
+
+echo -e "\n[+] Servicios actualmente EJECUTÁNDOSE (systemctl --state=running):"
+systemctl list-units --type=service --state=running --no-pager | awk '{print "  " $1}' | grep -vE '^UNIT|^$'
+echo "---"
+
+echo -e "\n[+] Conexiones de red activas (ESTABLISHED) con detalles de proceso (ss -tulnp):"
+# ss es el reemplazo moderno de netstat. -tulnp: TCP/UDP, listening, established, process, numeric
+ss -tulnp | grep 'ESTAB'
+echo "---"
+
+echo -e "\n[+] Puertos escuchando (LISTEN) en esta máquina (ss -tulnp):"
+ss -tulnp | grep 'LISTEN'
+echo "---"
+
+echo "✅ Auditoría inicial de servicios y conexiones completada ✅"
+
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/02_configurar_firewall.sh 
+
+#!/bin/bash
+# Script para configurar el firewall en el SERVIDOR DE BASE DE DATOS
+# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
+set -u
+set -e
+
+# <--- MODIFICACIÓN: Se ha añadido un comentario para justificar esta configuración ---
+# El escaneo de Fase 1 confirmó que el servicio MySQL/MariaDB está en el puerto 3306.
+# Este es el único puerto de aplicación que dejaremos abierto.
+PUERTOS_BD_ABIERTOS=("3306/tcp") 
+
+echo "=== CONFIGURACIÓN DE FIREWALL EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
+echo "INFO: Ejecutando con privilegios de root."
+
+if ! command -v firewall-cmd &> /dev/null; then
+    echo "ERROR: firewalld no está instalado. Instalar con: dnf install -y firewalld (o equivalente)"
+    exit 1
+fi
+
+if ! systemctl is-active --quiet firewalld; then
+    echo "INFO: firewalld no está activo. Intentando iniciar y habilitar..."
+    systemctl enable --now firewalld || { echo "ERROR: No se pudo iniciar firewalld."; exit 1; }
+fi
+
+ZONA_ACTIVA=$(firewall-cmd --get-default-zone)
+echo "INFO: Se aplicarán reglas a la zona por defecto: $ZONA_ACTIVA"
+
+echo "INFO: Estado actual del firewall en zona '$ZONA_ACTIVA':"
+firewall-cmd --zone="$ZONA_ACTIVA" --list-all
+echo "--------------------------------------------------"
+
+echo "INFO: Aplicando política restrictiva..."
+# <--- MODIFICACIÓN: Comentario añadido para explicar la selección de servicios a remover ---
+# Basado en el escaneo de Fase 1, los servicios http y https (puertos 80 y 443) estaban abiertos.
+# Estos servicios son innecesarios y representan un riesgo en un servidor de BD dedicado.
+# Los incluimos aquí junto con otros servicios comúnmente inseguros para asegurarnos de que el firewall los bloquee.
+SERVICIOS_A_REMOVER=("ftp" "telnet" "samba" "http" "https") 
+for servicio in "${SERVICIOS_A_REMOVER[@]}"; do
+    if firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
+        echo "  Removiendo servicio innecesario/inseguro: $servicio"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --remove-service="$servicio"
+    fi
+done
+
+# <--- SIN MODIFICACIÓN: Se mantiene ssh como servicio esencial para la administración ---
+SERVICIOS_A_ASEGURAR=("ssh") 
+for servicio in "${SERVICIOS_A_ASEGURAR[@]}"; do
+    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-service="$servicio" &>/dev/null; then
+        echo "  Añadiendo servicio esencial: $servicio"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-service="$servicio"
+    fi
+done
+
+for puerto_bd in "${PUERTOS_BD_ABIERTOS[@]}"; do
+    if ! firewall-cmd --permanent --zone="$ZONA_ACTIVA" --query-port="$puerto_bd" &>/dev/null; then
+        echo "  Permitiendo puerto de base de datos: $puerto_bd"
+        firewall-cmd --permanent --zone="$ZONA_ACTIVA" --add-port="$puerto_bd"
+    else
+        echo "  Puerto de base de datos $puerto_bd ya permitido."
+    fi
+done
+
+
+echo "INFO: Recargando firewalld para aplicar las nuevas reglas..."
+if firewall-cmd --reload; then
+    echo "INFO: Firewall recargado."
+else
+    echo "ERROR: Falló la recarga del firewall."
+    exit 1
+fi
+
+echo "INFO: Configuración final del firewall en zona '$ZONA_ACTIVA':"
+firewall-cmd --zone="$ZONA_ACTIVA" --list-all
+echo "--------------------------------------------------"
+echo "✅ Configuración del firewall del servidor de BD completada ✅"
+
+
+==================================================
+=== FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/03_ajustar_permisos.sh 
+
+#!/bin/bash
+# Script para ajustar permisos en el SERVIDOR DE BASE DE DATOS
+# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
+set -u
+set -e
+
+# <--- MODIFICACIÓN: Activamos las reglas para MySQL/MariaDB y añadimos comentarios ---
+# Basado en el escaneo de Fase 1, se detectó un servidor MySQL/MariaDB.
+# Por lo tanto, se activan estas reglas para asegurar los archivos de configuración y datos.
+ARCHIVOS_SENSIBLES=(
+    "/etc/shadow:600:f"
+    "/etc/gshadow:600:f"
+    "/etc/passwd:644:f"
+    "/etc/group:644:f"
+    "/root:700:d"
+    # Reglas específicas para MySQL/MariaDB activadas:
+    "/var/lib/mysql:700:d"     # Directorio de datos de MySQL/MariaDB
+    "/etc/my.cnf:600:f"        # Archivo de configuración principal de MySQL/MariaDB
+)
+
+echo "=== AJUSTE DE PERMISOS CRÍTICOS EN SERVIDOR DE BASE DE DATOS ($(hostname)) ==="
+echo "INFO: Ejecutando con privilegios de root."
+
+for item_perm_tipo in "${ARCHIVOS_SENSIBLES[@]}"; do
+    IFS=':' read -r item perm_deseado tipo <<< "$item_perm_tipo"
+    
+    if [ ! -e "$item" ]; then
+        echo "AVISO: El archivo o directorio '$item' no existe. Saltando."
+        continue
+    fi
+
+    perm_actual=$(stat -c "%a" "$item")
+    echo "Verificando: $item (Actual: $perm_actual, Deseado: $perm_deseado)"
+
+    if [ "$perm_actual" != "$perm_deseado" ]; then
+        echo "  Ajustando permisos de '$item' de $perm_actual a $perm_deseado..."
+        if chmod "$perm_deseado" "$item"; then
+            echo "    Permisos ajustados."
+        else
+            echo "    ERROR: Falló el ajuste de permisos para '$item'."
+        fi
+    else
+        echo "  Permisos para '$item' ya son correctos ($perm_actual)."
+    fi
+    
+    # Mostrar permisos después del intento de ajuste
+    if [ "$tipo" == "d" ]; then ls -ld "$item"; else ls -l "$item"; fi
+    echo "---"
+done
+echo "✅ Ajuste de permisos completado ✅"
+==================================================
+=== FIN DEL REPORTE ===
+==================================================
