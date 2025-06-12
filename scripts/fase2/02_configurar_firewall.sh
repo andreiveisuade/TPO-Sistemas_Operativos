@@ -1,9 +1,19 @@
 #!/bin/bash
 
-# Activa el firewall y abre solo los servicios necesarios
-systemctl enable --now firewalld
-ZONA=$(firewall-cmd --get-default-zone)
+# Activa el firewall y aplica una política estricta: solo lo esencial.
 
-firewall-cmd --permanent --zone="$ZONA" --add-service=ssh
-firewall-cmd --permanent --zone="$ZONA" --add-port=3306/tcp
+# Asegura que firewalld esté activo, pero no da error si ya lo estaba.
+systemctl enable --now firewalld > /dev/null 2>&1
+
+# Eliminar servicios innecesarios
+
+# Basado en el hallazgo de Fase 1, cerramos explícitamente http/https.
+firewall-cmd --permanent --remove-service=http > /dev/null 2>&1
+firewall-cmd --permanent --remove-service=https > /dev/null 2>&1
+
+# Añadir solo los servicios/puertos requeridos
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-port=3306/tcp
+
+# Recargar para aplicar todos los cambios
 firewall-cmd --reload

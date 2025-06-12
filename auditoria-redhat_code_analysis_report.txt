@@ -2,12 +2,12 @@
 === REPORTE DE ANÁLISIS DE CÓDIGO ===
 Proyecto: auditoria-redhat
 Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat
-Generado el: Thu Jun 12 10:01:05 -03 2025
+Generado el: Thu Jun 12 10:15:55 -03 2025
 ==================================================
 
 --- INFORMACIÓN DEL REPOSITORIO GIT ---
 Rama actual: main
-Último commit: da79d66 - Revert "Version simplificada" (andreiveisuade, 4 minutes ago)
+Último commit: 2be919b - Version FINAL SIMPLIFICADA (andreiveisuade, 53 seconds ago)
 ---
 
 --- ESTRUCTURA DEL DIRECTORIO ---
@@ -34,87 +34,47 @@ Rama actual: main
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_fase1.sh 
 
 #!/bin/bash
-# Usamos bash como intérprete del script
 
-set -u
-# Hace que el script termine si se usa una variable no definida (mejor para evitar errores silenciosos)
-
+# Argumento: IP o hostname de la máquina a auditar
 MAQUINA_TARGET="$1"
 
-
+# Carpeta y archivo de log
 LOG_DIR="./logs_auditoria"
-# Directorio donde se guardarán los archivos de log
-
 mkdir -p "$LOG_DIR"
 FECHA=$(date +"%Y%m%d_%H%M%S")
-MAQUINA_ACTUAL=$(hostname)
-LOG="${LOG_DIR}/auditoria_Fase1_${MAQUINA_ACTUAL}_to_${MAQUINA_TARGET}_${FECHA}.txt"
+LOG="$LOG_DIR/auditoria_Fase1_$(hostname)_to_${MAQUINA_TARGET}_$FECHA.txt"
 
-# Inicio de auditoría
-echo "INICIO DE AUDITORÍA (Fase 1 - Escaneo Remoto): $(date '+%Y-%m-%d %H:%M:%S %Z')" > "$LOG"
-echo "Ejecutada desde: $MAQUINA_ACTUAL" >> "$LOG"
-echo "Servidor de Base de Datos Objetivo: $MAQUINA_TARGET" >> "$LOG"
-echo "----------------------------------------------------------" >> "$LOG"
-echo "" >> "$LOG"
+echo "[+] Iniciando auditoria_fase1.sh" | tee -a "$LOG"
 
-SCRIPTS_DIR_FASE1="./scripts/fase1"
-# Carpeta donde se encuentran los scripts de la fase 1 de auditoría
+# Ejecuta el script de escaneo y guarda salida en el log
+bash ./scripts/fase1/01_escanear.sh "$MAQUINA_TARGET" | tee -a "$LOG"
 
-SCRIPT_ESCANEAR="${SCRIPTS_DIR_FASE1}/01_escanear.sh"
-# Ruta completa al script de escaneo remoto
-
-# Verificar si el script de escaneo existe
-if [ ! -f "$SCRIPT_ESCANEAR" ]; then
-    echo "ERROR: No se encontró el script de escaneo de Fase 1: '$SCRIPT_ESCANEAR'" | tee -a "$LOG" >&2
-    echo "FIN DE AUDITORÍA (Fase 1) con error." | tee -a "$LOG" >&2
-    exit 1
-fi
-
-
-echo "== Ejecutando $(basename "$SCRIPT_ESCANEAR") para $MAQUINA_TARGET ==" | tee -a "$LOG"
-# Imprime y registra en el log qué script se está ejecutando y para qué máquina
-
-# Ejecuta el script de escaneo y guarda toda su salida (stdout + stderr) en el log
-# tee -a aquí para que la salida también se muestre en la consola
-if bash "$SCRIPT_ESCANEAR" "$MAQUINA_TARGET" | tee -a "$LOG"; then
-    echo "$(basename "$SCRIPT_ESCANEAR") finalizado con éxito." | tee -a "$LOG"
-    exit 0
-else
-    echo "$(basename "$SCRIPT_ESCANEAR") finalizó con errores. Revisar log." | tee -a "$LOG" >&2
-    exit 1
-fi
-
-
-echo "" >> "$LOG"
-echo "----------------------------------------------------------" >> "$LOG"
-echo -e "FIN DE AUDITORÍA (Fase 1): $(date '+%Y-%m-%d %H:%M:%S %Z')\nLog de Fase 1 guardado en: $LOG\nAuditoría Fase 1 completada. Ver resultados en: $LOG" | tee -a "$LOG"
+echo "[+] Fin auditoria_fase1.sh" | tee -a "$LOG"
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/auditoria_fase2.sh 
 
 #!/bin/bash
-# Script a ejecutar en WORKSTATION para ejecutar scripts de endurecimiento en un SERVIDOR REMOTO (BD)
-set -u
 
+# Argumentos: usuario SSH y máquina destino
 USER="$1"
 TARGET="$2"
-FECHA=$(date +"%Y%m%d_%H%M%S")
-HOST=$(hostname)
+
+# Carpeta y archivo de log
 LOG_DIR="./logs_auditoria"
 mkdir -p "$LOG_DIR"
-LOG="${LOG_DIR}/fase2_${HOST}_to_${TARGET}_${FECHA}.log"
+FECHA=$(date +"%Y%m%d_%H%M%S")
+LOG="$LOG_DIR/fase2_$(hostname)_to_${TARGET}_$FECHA.log"
 
-SCRIPTS=(01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh)
+echo "[+] Iniciando auditoria_fase2.sh" | tee -a "$LOG"
 
-for script in "${SCRIPTS[@]}"; do
-  PATH_LOCAL="./scripts/fase2/$script"
-  [[ -f "$PATH_LOCAL" ]] || { echo "No existe $PATH_LOCAL"; continue; }
-
-  echo "[+] Ejecutando $script en $TARGET" | tee -a "$LOG"
-  ssh -t "$USER@$TARGET" "sudo bash -s" < "$PATH_LOCAL" >> "$LOG" 2>&1 \
-    && echo "[OK] $script" | tee -a "$LOG" \
-    || echo "[ERROR] $script" | tee -a "$LOG"
+# Ejecuta los scripts de endurecimiento en el servidor remoto
+for s in 01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh; do
+  echo "[+] Ejecutando $s" | tee -a "$LOG"
+  ssh -t "$USER@$TARGET" "sudo bash -s" < "./scripts/fase2/$s" | tee -a "$LOG"
 done
+
+echo "[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/consigna.md 
@@ -273,173 +233,61 @@ set relativenumber # Habilita el número relativo de las líneas en vim
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase1/01_escanear.sh 
 
 #!/bin/bash
-# Script para realizar un escaneo de seguridad REMOTA del servidor objetivo.
-# Realiza un análisis de puertos abiertos y servicios en ejecución en un servidor remoto.
-#
-# Requisitos:
-# El comando nmap debe estar instalado previamente en el sistema
 
-set -u
-# Hace que el script termine si se usa una variable no definida
+# Escanea puertos abiertos y versiones de servicios en una máquina remota
+MAQUINA_TARGET="$1"
 
-# --- Configuración inicial ---
-MAQUINA_TARGET="$1"  # IP o hostname del servidor objetivo
+echo "[+] Escaneo rápido de puertos (-F)"
+nmap -F "$MAQUINA_TARGET"
 
-# Verificar que se recibió un argumento (aunque el script principal ya lo hace, buena práctica)
-if [ -z "$MAQUINA_TARGET" ]; then
-    echo "ERROR: No se recibió el argumento de máquina objetivo en el script de escaneo." >&2
-    exit 1
-fi
-
-FECHA_ESCANEO=$(date +"%Y%m%d_%H%M%S")
-MAQUINA_EJECUTORA=$(hostname)
-
-# Verificar que nmap esté instalado
-if ! command -v nmap &> /dev/null; then
-    echo "ERROR: nmap no está instalado. Por favor instálalo manualmente." >&2
-    exit 1
-fi
-
-echo "=== INICIANDO ESCANEO REMOTO DE SEGURIDAD ==="
-echo "Objetivo de Escaneo: $MAQUINA_TARGET"
-echo "Ejecutado desde: $MAQUINA_EJECUTORA"
-echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
-echo "---------------------------------------------"
-
-# --- Verificación de conectividad ---
-echo -e "\n[+] Verificando conectividad con $MAQUINA_TARGET..."
-# Usamos ping con 1 paquete (-c 1) y timeout de 1 segundo (-W 1)
-if ping -c 1 -W 1 "$MAQUINA_TARGET" &> /dev/null; then
-    echo "  Conectividad OK."
-else
-    echo "ERROR: No se puede alcanzar la máquina objetivo '$MAQUINA_TARGET'." >&2
-    echo "Verifica la IP/hostname y la conectividad de red." >&2
-    exit 1 # Salir si no hay conectividad
-fi
-echo "---------------------------------------------"
-
-
-# --- Escaneo rápido de puertos ---
-# Realiza un escaneo rápido de los 100 puertos TCP más comunes en el objetivo.
-#   -F: Escaneo rápido (Fast) - Escanea solo los 100 puertos más comunes
-echo -e "\n[+] Iniciando escaneo rápido de puertos TCP más comunes (-F)..."
-# Capturamos el estado de salida de nmap
-if ! nmap -F "$MAQUINA_TARGET"; then
-    echo "ERROR: Falló el escaneo rápido de puertos." >&2
-    # No salimos aquí, intentamos el siguiente escaneo si es posible
-fi
-
-# --- Escaneo detallado de servicios ---
-# Realiza un escaneo más exhaustivo para detectar versiones de servicios en puertos abiertos.
-#   -sV: Detección de versiones - Determina la versión de los servicios encontrados. De esta manera se puede identificar el tipo de servicio y su versión para actualizarlos y evitar vulnerabilidades.
-#   Este escaneo es más lento pero proporciona información valiosa sobre los servicios
-
-echo -e "\n[+] Detectando servicios y versiones en puertos abiertos (-sV)..."
-if ! nmap -sV "$MAQUINA_TARGET"; then
-    echo "ERROR: Falló la detección de servicios." >&2
-    # No salimos aquí, permitimos que finalice el script
-fi
-
-echo -e "\n[+] Auditoría de red remota (escaneo de $MAQUINA_TARGET) finalizada."
-
-# El script de escaneo finaliza siempre con éxito (exit 0) a menos que falle la conectividad
-# o nmap no esté instalado. Los fallos de los escaneos individuales se reportan como ERROR
-# pero no detienen el script a menos que sea un fallo fundamental.
-exit 0
+echo "[+] Detección de versiones de servicios (-sV)"
+nmap -sV "$MAQUINA_TARGET"
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/01_auditar_inicial_bd.sh 
 
 #!/bin/bash
-# Script a ejecutar en el SERVIDOR DE BASE DE DATOS
-# Este script realiza una auditoría inicial de servicios y conexiones LOCALES.
-# Se ejecuta como root mediante "sudo bash -s" desde auditoria_fase2.sh.
-set -u
-set -e
 
-echo "=== AUDITORÍA INICIAL DE SERVICIOS Y CONEXIONES (en $(hostname)) ==="
-echo "INFO: Ejecutando con privilegios de root."
-echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
-echo "------------------------------------------------------------------"
+# Muestra información básica sobre servicios y conexiones locales
 
-echo -e "\n[+] Servicios habilitados para iniciar al arranque (systemctl --state=enabled):"
-systemctl list-unit-files --type=service --state=enabled --no-pager | awk '{print "  " $1, $2}' | grep -vE '^UNIT|^$'
-echo "---"
+echo "[+] Servicios habilitados al arranque"
+systemctl list-unit-files --type=service --state=enabled
 
-echo -e "\n[+] Servicios actualmente EJECUTÁNDOSE (systemctl --state=running):"
-systemctl list-units --type=service --state=running --no-pager | awk '{print "  " $1}' | grep -vE '^UNIT|^$'
-echo "---"
+echo "[+] Servicios en ejecución"
+systemctl list-units --type=service --state=running
 
-echo -e "\n[+] Conexiones de red activas (ESTABLISHED) con detalles de proceso (ss -tulnp):"
-# ss es el reemplazo moderno de netstat. -tulnp: TCP/UDP, listening, established, process, numeric
-ss -tulnp | grep 'ESTAB'
-echo "---"
+echo "[+] Conexiones activas"
+ss -tulnp | grep ESTAB
 
-echo -e "\n[+] Puertos escuchando (LISTEN) en esta máquina (ss -tulnp):"
-ss -tulnp | grep 'LISTEN'
-echo "---"
-
-echo "✅ Auditoría inicial de servicios y conexiones completada ✅"
+echo "[+] Puertos escuchando"
+ss -tulnp | grep LISTEN
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/02_configurar_firewall.sh 
 
 #!/bin/bash
-# Script para configurar el firewall en el SERVIDOR DE BASE DE DATOS
-# ESTE SCRIPT SE EJECUTA COMO ROOT MEDIANTE "sudo bash -s" DESDE EL SCRIPT auditoria_fase2.sh
-set -u
-set -e
 
-PUERTOS_BD_ABIERTOS=("3306/tcp")
-SERVICIOS_A_REMOVER=("http" "https" "ftp" "telnet" "samba")
-
-[[ -x "$(command -v firewall-cmd)" ]] || { echo "No está firewalld"; exit 1; }
+# Activa el firewall y abre solo los servicios necesarios
 systemctl enable --now firewalld
-
 ZONA=$(firewall-cmd --get-default-zone)
-echo "[*] Configurando zona: $ZONA"
-
-for s in "${SERVICIOS_A_REMOVER[@]}"; do
-  firewall-cmd --permanent --zone="$ZONA" --remove-service="$s" 2>/dev/null || true
-done
 
 firewall-cmd --permanent --zone="$ZONA" --add-service=ssh
-
-for p in "${PUERTOS_BD_ABIERTOS[@]}"; do
-  firewall-cmd --permanent --zone="$ZONA" --add-port="$p"
-done
-
+firewall-cmd --permanent --zone="$ZONA" --add-port=3306/tcp
 firewall-cmd --reload
-firewall-cmd --zone="$ZONA" --list-all
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/03_ajustar_permisos.sh 
 
 #!/bin/bash
-set -eu
 
-ARCHIVOS=(
-  "/etc/shadow:600"
-  "/etc/gshadow:600"
-  "/etc/passwd:644"
-  "/etc/group:644"
-  "/root:700"
-  "/var/lib/mysql:700"
-  "/etc/my.cnf:600"
-)
+# Ajusta permisos de archivos y directorios críticos
+chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
+chmod 644 /etc/passwd /etc/group
+chmod 700 /root /var/lib/mysql
+chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
+chmod 644 /etc/passwd /etc/group
+chmod 700 /root /var/lib/mysql
 
-for item in "${ARCHIVOS[@]}"; do
-  path="${item%%:*}"
-  perm="${item##*:}"
-  [[ -e "$path" ]] || { echo "No existe $path"; continue; }
-
-  actual=$(stat -c "%a" "$path")
-  if [ "$actual" != "$perm" ]; then
-    chmod "$perm" "$path" && echo "✔ $path → $perm"
-  else
-    echo "✓ $path ya tiene permisos correctos"
-  fi
-done
 ==================================================
 === FIN DEL REPORTE ===
 ==================================================
