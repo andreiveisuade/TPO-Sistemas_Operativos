@@ -71,17 +71,11 @@ La notación 172.25.250.0/24 define una red con máscara de 24 bits (255.255.255
 Sin embargo, las direcciones .0 (red) y .255 (broadcast) no pueden asignarse a dispositivos. Por lo tanto, los hosts válidos están entre 172.25.250.1 y 172.25.250.254.
 
 
-### Paso 5 Ejecutar Fase 1 - Escaneo remoto
+El resultado de esto se guarda en el log
 
-Desde `workstation`, ejecutar:
+## Fase 2
 
-```bash
-bash ./auditoria_fase1.sh utility
-```
-
-Esto realizará el escaneo remoto y generará un reporte en `workstation` en la carpeta `reportes`.
-
-### Paso 6 Verificar acceso SSH a `utility`
+### Paso 5 - Comprobar la conexion SSH con `utility`
 
 ```bash
 ssh student@utility
@@ -89,15 +83,30 @@ ssh student@utility
 
 Debe responder con la contraseña del usuario `student`.
 
-### Paso 7 Ejecutar Fase 2 - Endurecimiento
+### Paso 6 - Ejecutar Fase 2 - Endurecimiento
 
 Desde `workstation`, ejecutar:
 
 ```bash
-bash ./auditoria_fase2.sh utility
+./auditoria_fase2.sh student utility
 ```
 
 Esto realizará el endurecimiento remoto y generará un reporte en `workstation` en la carpeta `reportes`.
+
+### Paso 7 - Comprobar que los puertos se hayan cerrado
+
+```bash
+nmap utility
+```
+
+Debe responder con puertos cerrados.
+
+o si no con:
+
+```bash
+./auditoria_fase1.sh utility
+```
+
 
 
 
