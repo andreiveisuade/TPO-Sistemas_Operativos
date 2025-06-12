@@ -2,12 +2,12 @@
 === REPORTE DE ANÁLISIS DE CÓDIGO ===
 Proyecto: auditoria-redhat
 Ruta: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat
-Generado el: Thu Jun 12 10:15:55 -03 2025
+Generado el: Thu Jun 12 12:21:14 -03 2025
 ==================================================
 
 --- INFORMACIÓN DEL REPOSITORIO GIT ---
 Rama actual: main
-Último commit: 2be919b - Version FINAL SIMPLIFICADA (andreiveisuade, 53 seconds ago)
+Último commit: 25e57c1 - Version FINAL SIMPLIFICADA_V2_ ajustando Fase 2_1 (andreiveisuade, 11 minutes ago)
 ---
 
 --- ESTRUCTURA DEL DIRECTORIO ---
@@ -56,25 +56,57 @@ echo "[+] Fin auditoria_fase1.sh" | tee -a "$LOG"
 
 #!/bin/bash
 
-# Argumentos: usuario SSH y máquina destino
+# Este script debe ejecutarse desde el servidor workstation
+# Su objetivo es ejecutar los scripts de endurecimiento (Fase 2) de forma remota en el servidor de base de datos
+
+# Argumentos esperados:
+# $1 = usuario remoto (por ejemplo: student)
+# $2 = nombre o IP del servidor objetivo (por ejemplo: utility)
 USER="$1"
 TARGET="$2"
 
-# Carpeta y archivo de log
+# Se crea una carpeta para guardar los logs si no existe
 LOG_DIR="./logs_auditoria"
 mkdir -p "$LOG_DIR"
+
+# Se genera un nombre de archivo de log con la fecha actual
 FECHA=$(date +"%Y%m%d_%H%M%S")
 LOG="$LOG_DIR/fase2_$(hostname)_to_${TARGET}_$FECHA.log"
 
-echo "[+] Iniciando auditoria_fase2.sh" | tee -a "$LOG"
+# Encabezado del log para dejar bien marcado el inicio de la auditoría
+{
+  echo "=================================================="
+  echo "=== AUDITORÍA FASE 2: Endurecimiento del sistema ==="
+  echo "Target: $TARGET"
+  echo "Usuario: $USER"
+  echo "Fecha de ejecución: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+  echo "=================================================="
+  echo ""
+} | tee -a "$LOG"
 
-# Ejecuta los scripts de endurecimiento en el servidor remoto
+# Se registra el inicio de la auditoría en el log y en pantalla
+echo "[+] Iniciando auditoria_fase2.sh" | tee -a "$LOG"
+echo "--------------------------------------------------" | tee -a "$LOG"
+
+# Se define la lista de scripts a ejecutar en el servidor remoto
 for s in 01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh; do
-  echo "[+] Ejecutando $s" | tee -a "$LOG"
-  ssh -t "$USER@$TARGET" "sudo bash -s" < "./scripts/fase2/$s" | tee -a "$LOG"
+  # Se informa qué script se va a ejecutar
+  echo -e "\n[+] Ejecutando script: $s" | tee -a "$LOG"
+  echo "--------------------------------------------------" | tee -a "$LOG"
+
+  # 1. Se copia el script al servidor remoto (en /tmp)
+  scp "./scripts/fase2/$s" "$USER@$TARGET:/tmp/$s" > /dev/null
+
+  # 2. Se ejecuta el script de forma remota con sudo
+  #    sudo podrá pedir la contraseña porque la sesión es interactiva
+  # 3. Después de ejecutarlo, se elimina el script para limpiar el entorno
+  ssh -t "$USER@$TARGET" "sudo bash /tmp/$s && rm /tmp/$s" | tee -a "$LOG"
 done
 
-echo "[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
+# Se registra el fin de la auditoría
+echo -e "\n[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
+echo "==================================================" | tee -a "$LOG"
+echo "Log completo guardado en: $LOG" | tee -a "$LOG"
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/consigna.md 
@@ -186,17 +218,11 @@ La notación 172.25.250.0/24 define una red con máscara de 24 bits (255.255.255
 Sin embargo, las direcciones .0 (red) y .255 (broadcast) no pueden asignarse a dispositivos. Por lo tanto, los hosts válidos están entre 172.25.250.1 y 172.25.250.254.
 
 
-### Paso 5 Ejecutar Fase 1 - Escaneo remoto
+El resultado de esto se guarda en el log
 
-Desde `workstation`, ejecutar:
+## Fase 2
 
-```bash
-bash ./auditoria_fase1.sh utility
-```
-
-Esto realizará el escaneo remoto y generará un reporte en `workstation` en la carpeta `reportes`.
-
-### Paso 6 Verificar acceso SSH a `utility`
+### Paso 5 - Comprobar la conexion SSH con `utility`
 
 ```bash
 ssh student@utility
@@ -204,15 +230,30 @@ ssh student@utility
 
 Debe responder con la contraseña del usuario `student`.
 
-### Paso 7 Ejecutar Fase 2 - Endurecimiento
+### Paso 6 - Ejecutar Fase 2 - Endurecimiento
 
 Desde `workstation`, ejecutar:
 
 ```bash
-bash ./auditoria_fase2.sh utility
+./auditoria_fase2.sh student utility
 ```
 
 Esto realizará el endurecimiento remoto y generará un reporte en `workstation` en la carpeta `reportes`.
+
+### Paso 7 - Comprobar que los puertos se hayan cerrado
+
+```bash
+nmap utility
+```
+
+Debe responder con puertos cerrados.
+
+o si no con:
+
+```bash
+./auditoria_fase1.sh utility
+```
+
 
 
 
@@ -250,16 +291,20 @@ nmap -sV "$MAQUINA_TARGET"
 
 # Muestra información básica sobre servicios y conexiones locales
 
-echo "[+] Servicios habilitados al arranque"
+echo "========== AUDITORÍA DE SERVICIOS Y CONEXIONES =========="
+echo "Hostname: $(hostname)"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+echo -e "\n[+] Servicios habilitados al arranque"
 systemctl list-unit-files --type=service --state=enabled
 
-echo "[+] Servicios en ejecución"
+echo -e "\n[+] Servicios en ejecución"
 systemctl list-units --type=service --state=running
 
-echo "[+] Conexiones activas"
+echo -e "\n[+] Conexiones activas (ESTABLISHED)"
 ss -tulnp | grep ESTAB
 
-echo "[+] Puertos escuchando"
+echo -e "\n[+] Puertos escuchando (LISTEN)"
 ss -tulnp | grep LISTEN
 
 ==================================================
@@ -267,27 +312,50 @@ ss -tulnp | grep LISTEN
 
 #!/bin/bash
 
-# Activa el firewall y abre solo los servicios necesarios
-systemctl enable --now firewalld
-ZONA=$(firewall-cmd --get-default-zone)
+# Activa el firewall y aplica una política estricta: solo lo esencial.
 
-firewall-cmd --permanent --zone="$ZONA" --add-service=ssh
-firewall-cmd --permanent --zone="$ZONA" --add-port=3306/tcp
+echo "========== CONFIGURACIÓN DE FIREWALL =========="
+echo "Hostname: $(hostname)"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+# Asegura que firewalld esté activo, pero no da error si ya lo estaba.
+systemctl enable --now firewalld > /dev/null 2>&1
+
+# Eliminar servicios innecesarios
+
+# Basado en el hallazgo de Fase 1, cerramos explícitamente http/https.
+firewall-cmd --permanent --remove-service=http > /dev/null 2>&1
+firewall-cmd --permanent --remove-service=https > /dev/null 2>&1
+
+# Añadir solo los servicios/puertos requeridos
+firewall-cmd --permanent --add-service=ssh
+firewall-cmd --permanent --add-port=3306/tcp
+
+# Recargar para aplicar todos los cambios
 firewall-cmd --reload
+
+# Mostrar configuración final
+firewall-cmd --list-all
 
 ==================================================
 === FILE: /Users/andreiveis/UADE/2do cuatrimestre/07_Sistemas Operativos/TP_RedHat/auditoria-redhat/scripts/fase2/03_ajustar_permisos.sh 
 
 #!/bin/bash
 
-# Ajusta permisos de archivos y directorios críticos
-chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
-chmod 644 /etc/passwd /etc/group
-chmod 700 /root /var/lib/mysql
-chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
-chmod 644 /etc/passwd /etc/group
-chmod 700 /root /var/lib/mysql
+# Ajusta permisos de archivos y directorios críticos.
 
+echo "========== AJUSTE DE PERMISOS =========="
+echo "Hostname: $(hostname)"
+echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+# Permisos para archivos de contraseñas y configuración de BD
+chmod 600 /etc/shadow /etc/gshadow /etc/my.cnf
+
+# Permisos para archivos de usuarios/grupos
+chmod 644 /etc/passwd /etc/group
+
+# Permisos para directorios sensibles (root y datos de BD)
+chmod 700 /root /var/lib/mysql
 ==================================================
 === FIN DEL REPORTE ===
 ==================================================

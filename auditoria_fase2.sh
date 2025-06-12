@@ -17,22 +17,46 @@ mkdir -p "$LOG_DIR"
 FECHA=$(date +"%Y%m%d_%H%M%S")
 LOG="$LOG_DIR/fase2_$(hostname)_to_${TARGET}_$FECHA.log"
 
+# Pedir la contraseña una sola vez
+echo -n "Ingrese la contraseña de sudo para $USER@$TARGET: "
+read -s SUDO_PASS
+echo
+
+# Encabezado del log para dejar bien marcado el inicio de la auditoría
+{
+  echo "=================================================="
+  echo "=== AUDITORÍA FASE 2: Endurecimiento del sistema ==="
+  echo "Target: $TARGET"
+  echo "Usuario: $USER"
+  echo "Fecha de ejecución: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+  echo "=================================================="
+  echo ""
+} | tee -a "$LOG"
+
 # Se registra el inicio de la auditoría en el log y en pantalla
 echo "[+] Iniciando auditoria_fase2.sh" | tee -a "$LOG"
+echo "--------------------------------------------------" | tee -a "$LOG"
 
 # Se define la lista de scripts a ejecutar en el servidor remoto
 for s in 01_auditar_inicial_bd.sh 02_configurar_firewall.sh 03_ajustar_permisos.sh; do
   # Se informa qué script se va a ejecutar
-  echo "[+] Ejecutando $s" | tee -a "$LOG"
+  echo -e "\n[+] Ejecutando script: $s" | tee -a "$LOG"
+  echo "--------------------------------------------------" | tee -a "$LOG"
 
   # 1. Se copia el script al servidor remoto (en /tmp)
-  scp "./scripts/fase2/$s" "$USER@$TARGET:/tmp/$s"
+  scp "./scripts/fase2/$s" "$USER@$TARGET:/tmp/$s" > /dev/null
 
-  # 2. Se ejecuta el script de forma remota con sudo
-  #    sudo podrá pedir la contraseña porque la sesión es interactiva
+  # 2. Se ejecuta el script de forma remota con sudo usando -t y -S
+  # -t: asigna pseudo-terminal para confiabilidad
+  # -S: lee contraseña desde stdin
   # 3. Después de ejecutarlo, se elimina el script para limpiar el entorno
-  ssh "$USER@$TARGET" "sudo bash /tmp/$s && rm /tmp/$s"
+  echo "$SUDO_PASS" | ssh -t "$USER@$TARGET" "sudo -S bash /tmp/$s && rm /tmp/$s" | tee -a "$LOG"
 done
 
+# Limpia la variable de entorno con la contraseña por seguridad
+unset SUDO_PASS
+
 # Se registra el fin de la auditoría
-echo "[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
+echo -e "\n[+] Fin auditoria_fase2.sh" | tee -a "$LOG"
+echo "==================================================" | tee -a "$LOG"
+echo "Log completo guardado en: $LOG" | tee -a "$LOG"
