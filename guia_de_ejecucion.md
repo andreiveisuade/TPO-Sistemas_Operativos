@@ -110,15 +110,4 @@ o si no con:
 
 
 
-xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5
 
-
-git clone https://github.com/andreiveisuade/TPO-Sistemas_Operativos.git
-
-nmap -sn 172.25.250.0/24
-
-nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}'
-
-./auditoria_fase1.sh $(nmap -sn 172.25.250.0/24 | grep "utility" | awk -F '[()]' '{print $2}')
-
-set relativenumber # Habilita el número relativo de las líneas en vim
