@@ -6,12 +6,33 @@ echo "========== AJUSTE DE PERMISOS =========="
 echo "Hostname: $(hostname)"
 echo "Fecha: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 
-# Archivos sensibles
-chmod 600 /etc/shadow /etc/gshadow 2>/dev/null
-chmod 644 /etc/passwd /etc/group 2>/dev/null
+# Lista de archivos o directorios con permisos deseados (ruta:permiso)
+ITEMS=(
+  "/etc/shadow:600"
+  "/etc/gshadow:600"
+  "/etc/passwd:644"
+  "/etc/group:644"
+  "/root:700"
+  "/var/lib/mysql:700"
+)
 
-# Directorios críticos
-chmod 700 /root /var/lib/mysql 2>/dev/null
+# Si existe /etc/my.cnf lo agregamos a la lista
+[[ -f /etc/my.cnf ]] && ITEMS+=("/etc/my.cnf:600")
 
-# Configuración de base de datos si existe
-[[ -f /etc/my.cnf ]] && chmod 600 /etc/my.cnf
+# Recorremos cada ítem
+for item in "${ITEMS[@]}"; do
+  path="${item%%:*}"
+  desired="${item##*:}"
+
+  if [[ -e "$path" ]]; then
+    actual=$(stat -c "%a" "$path")
+    if [[ "$actual" != "$desired" ]]; then
+      chmod "$desired" "$path"
+      echo "✔ $path: $actual → $desired (modificado)"
+    else
+      echo "✓ $path: ya tenía permisos $actual"
+    fi
+  else
+    echo "✘ $path: no existe, no se pudo aplicar permisos"
+  fi
+done

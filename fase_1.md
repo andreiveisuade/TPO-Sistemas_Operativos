@@ -2,9 +2,9 @@
 # Guía Paso a Paso - Ejecución Fase 1
 
 ## Prerequisitos
-- Tener ambos servidores (`workstation` y `utility`) encendidos
-- xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5
-- git clone https://github.com/andreiveisuade/TPO-Sistemas_Operativos.git
+Tener ambos servidores (`workstation` y `utility`) encendidos
+xrandr --output $(xrandr | grep " connected" | awk '{ print $1 }') --mode 1920x1080 ; gsettings set org.gnome.desktop.interface text-scaling-factor 1.5
+git clone https://github.com/andreiveisuade/TPO-Sistemas_Operativos.git
 
 ---
 
