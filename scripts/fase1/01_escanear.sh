@@ -3,8 +3,5 @@
 # Escanea puertos abiertos y versiones de servicios en una máquina remota
 MAQUINA_TARGET="$1"
 
-echo "[+] Escaneo rápido de puertos (-F)"
-nmap -F "$MAQUINA_TARGET"
-
-echo "[+] Detección de versiones de servicios (-sV)"
-nmap -sV "$MAQUINA_TARGET"
+echo "[+] Escaneo rápido de puertos (-F) y detección de versiones de servicios (-sV)"
+nmap -F -sV "$MAQUINA_TARGET"
